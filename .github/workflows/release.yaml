@@ -1,0 +1,94 @@
+name: Release
+# Publishes to Maven Central through the release parent's 'release' and 'central-portal'
+# profiles, the same way the Business Cockpit itself is released. Everything happens on a
+# release branch, so main is never carrying a released version.
+"on":
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Version to release (e.g. 0.9.0)"
+        required: true
+concurrency:
+  group: businesscockpit-camunda7-adapter-release
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v6
+        with:
+          java-version: 21
+          distribution: temurin
+          cache: maven
+          server-id: vanillabp-central
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+          gpg-private-key: "${{ secrets.MAVEN_GPG_PRIVATE_KEY }}"
+          gpg-passphrase: GPG_PASSPHRASE
+      - name: Create the release branch
+        run: git checkout -b release/${{ github.event.inputs.release_version }} origin/main
+      - name: Set the release version
+        run: |
+          mvn --batch-mode --no-transfer-progress versions:set \
+            -DnewVersion=${{ github.event.inputs.release_version }}
+          find . -name pom.xml.versionsBackup -delete
+      # a release must not depend on anything that can still change under it
+      - name: No SNAPSHOT dependency is left
+        run: |
+          if grep -R "SNAPSHOT" --include=pom.xml . ; then
+            echo "::error::A SNAPSHOT dependency is left in the release."
+            exit 1
+          fi
+      - name: Build and deploy to Maven Central
+        run: mvn -s $GITHUB_WORKSPACE/.github/workflows/github-packages-settings.xml
+          --batch-mode --no-transfer-progress -Dgpg.passphrase=$GPG_PASSPHRASE
+          clean deploy -Prelease,central-portal
+        env:
+          GPG_PASSPHRASE: "${{ secrets.MAVEN_GPG_PASSPHRASE }}"
+          MAVEN_USERNAME: "${{ secrets.MAVEN_CENTRAL_PORTAL_TOKEN_USER }}"
+          MAVEN_PASSWORD: "${{ secrets.MAVEN_CENTRAL_PORTAL_TOKEN_PW }}"
+          USER_NAME: "${{ secrets.VANILLABP_USER_NAME }}"
+          USER_TOKEN: "${{ secrets.VANILLABP_USER_TOKEN }}"
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      - name: Commit and tag the release
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git commit -a -m "Prepare release ${{ github.event.inputs.release_version }}"
+          git tag -a "${{ github.event.inputs.release_version }}" \
+            -m "Release ${{ github.event.inputs.release_version }}"
+          git push origin "${{ github.event.inputs.release_version }}"
+      - name: Create the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "${{ github.event.inputs.release_version }}"
+          name: "v${{ github.event.inputs.release_version }}"
+          generate_release_notes: true
+          draft: true
+      - name: Set the next snapshot version
+        run: |
+          RELEASE_VERSION=${{ github.event.inputs.release_version }}
+          IFS='.' read -r major minor patch <<< "$RELEASE_VERSION"
+          NEXT="$major.$minor.$((patch + 1))-SNAPSHOT"
+          mvn --batch-mode --no-transfer-progress versions:set -DnewVersion=$NEXT
+          find . -name pom.xml.versionsBackup -delete
+          git commit -a -m "Set next version $NEXT"
+          git push origin HEAD:release/${{ github.event.inputs.release_version }}
+      - name: Open the pull request back into main
+        run: |
+          gh pr create \
+            --title "Merge release/${{ github.event.inputs.release_version }} into main" \
+            --body "Automated pull request to merge the release branch." \
+            --base main \
+            --head release/${{ github.event.inputs.release_version }}
+        env:
+          GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"

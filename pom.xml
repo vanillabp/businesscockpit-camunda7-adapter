@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- the same release parent the Business Cockpit itself uses, because these artifacts are
+       released to Maven Central under the cockpit's groupId and have to be signed and
+       accompanied by sources and javadoc the way the rest of the cockpit is -->
+  <parent>
+    <groupId>io.vanillabp</groupId>
+    <artifactId>release-parent</artifactId>
+    <version>1.1.1</version>
+  </parent>
+
+  <groupId>io.vanillabp.businesscockpit</groupId>
+  <artifactId>businesscockpit-camunda7-adapter-parent</artifactId>
+  <version>0.9.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+  <name>VanillaBP Business Cockpit adapter for Camunda 7</name>
+  <description>Business Cockpit integration for Camunda 7, built as a VanillaBP 2 extension.</description>
+  <url>https://github.com/vanillabp/businesscockpit-camunda7-adapter</url>
+
+  <!-- No modules yet. The extension itself is written by story 36 and needs the cockpit's
+       extensions-commons artifact, which does not exist. What lands here then is the layout
+       every VanillaBP adapter repository has: core, spring-boot, quarkus/runtime,
+       quarkus/deployment and test-coverage-report. See README.md, section "What is here today". -->
+  <modules/>
+
+  <scm>
+    <connection>scm:git:https://github.com/vanillabp/businesscockpit-camunda7-adapter.git</connection>
+    <developerConnection>scm:git:https://github.com/vanillabp/businesscockpit-camunda7-adapter.git</developerConnection>
+    <url>https://github.com/vanillabp/businesscockpit-camunda7-adapter/tree/main</url>
+  </scm>
+
+  <distributionManagement>
+    <snapshotRepository>
+      <id>github</id>
+      <name>Github Packages</name>
+      <url>https://maven.pkg.github.com/vanillabp/businesscockpit-camunda7-adapter</url>
+    </snapshotRepository>
+  </distributionManagement>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <version.java>21</version.java>
+    <maven.compiler.release>21</maven.compiler.release>
+    <jacoco.version>0.8.15</jacoco.version>
+    <lombok.version>1.18.46</lombok.version>
+    <spi-for-java.version>1.2.0-SNAPSHOT</spi-for-java.version>
+    <adapter-platform.version>2.0.0-SNAPSHOT</adapter-platform.version>
+    <!-- the VanillaBP Camunda 7 adapter this extension plugs into: it names the processing
+         context the extension is wired with, and its engine is the one the extension adds its
+         listeners to -->
+    <camunda7-adapter.version>2.0.0-SNAPSHOT</camunda7-adapter.version>
+    <camunda.version>7.24.0</camunda.version>
+    <spring-boot.version>4.1.1</spring-boot.version>
+    <quarkus.version>3.39.1</quarkus.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>${spring-boot.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.quarkus</groupId>
+        <artifactId>quarkus-bom</artifactId>
+        <version>${quarkus.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.vanillabp</groupId>
+        <artifactId>spi-for-java</artifactId>
+        <version>${spi-for-java.version}</version>
+      </dependency>
+      <!-- what an extension implements: ExtensionWiringService. The adapter SPI is for BPMS
+           adapters and has no business in this repository. -->
+      <dependency>
+        <groupId>io.vanillabp</groupId>
+        <artifactId>vanillabp-extension-spi</artifactId>
+        <version>${adapter-platform.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.vanillabp</groupId>
+        <artifactId>vanillabp-spring-boot-integration</artifactId>
+        <version>${adapter-platform.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.vanillabp</groupId>
+        <artifactId>vanillabp-quarkus-integration</artifactId>
+        <version>${adapter-platform.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.vanillabp</groupId>
+        <artifactId>vanillabp-quarkus-integration-deployment</artifactId>
+        <version>${adapter-platform.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.vanillabp</groupId>
+        <artifactId>test-utils</artifactId>
+        <version>${adapter-platform.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.camunda.community.vanillabp</groupId>
+        <artifactId>camunda7-adapter</artifactId>
+        <version>${camunda7-adapter.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.camunda.bpm</groupId>
+        <artifactId>camunda-engine</artifactId>
+        <version>${camunda.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.projectlombok</groupId>
+        <artifactId>lombok</artifactId>
+        <version>${lombok.version}</version>
+        <optional>true</optional>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>3.5.6</version>
+          <configuration>
+            <!-- '@{jacoco.agent}' is resolved lazily per module (late property binding),
+                 forwarding coverage also into forked JVMs -->
+            <argLine>@{jacoco.agent}</argLine>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-failsafe-plugin</artifactId>
+          <version>3.5.6</version>
+          <configuration>
+            <argLine>@{jacoco.agent}</argLine>
+          </configuration>
+          <executions>
+            <execution>
+              <goals>
+                <goal>integration-test</goal>
+                <goal>verify</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>3.15.0</version>
+          <configuration>
+            <release>${version.java}</release>
+            <compilerArgs>
+              <!-- a javadoc which names a method is checked like any other claim: a link
+                   the compiler cannot resolve is an error, a parameter documented twice a
+                   warning. Only the reference group is on, so wording and missing comments
+                   stay a matter of review. -->
+              <arg>-Xdoclint:reference</arg>
+            </compilerArgs>
+            <annotationProcessorPaths>
+              <path>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+              </path>
+            </annotationProcessorPaths>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+    <plugins>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>${jacoco.version}</version>
+        <configuration>
+          <propertyName>jacoco.agent</propertyName>
+          <excludes>
+            <exclude>**/it/**</exclude>
+            <exclude>**/test/**</exclude>
+          </excludes>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>report</id>
+            <goals>
+              <goal>report</goal>
+            </goals>
+            <phase>verify</phase>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>3.10.1</version>
+        <configuration>
+          <pom>
+            <includes>
+              <include>**/pom.xml</include>
+            </includes>
+            <excludes>
+              <exclude>**/target/**/</exclude>
+              <exclude>**/node_modules/**/</exclude>
+              <!-- the workflows carry comments, and the YAML formatter round-trips
+                   through Jackson, which drops them -->
+              <exclude>**/.github/**/</exclude>
+            </excludes>
+            <sortPom>
+              <quiet>true</quiet>
+            </sortPom>
+          </pom>
+          <markdown>
+            <includes>
+              <include>**/*.md</include>
+            </includes>
+            <excludes>
+              <exclude>**/target/**/</exclude>
+              <exclude>**/node_modules/**/</exclude>
+              <exclude>**/.github/**/</exclude>
+            </excludes>
+            <flexmark/>
+          </markdown>
+          <yaml>
+            <includes>
+              <include>**/*.yaml</include>
+            </includes>
+            <excludes>
+              <exclude>**/target/**/</exclude>
+              <exclude>**/node_modules/**/</exclude>
+              <!-- Workflow files are excluded on purpose, the same way the other adapter
+                   repositories do it: the formatter drops comments, and it unquotes version
+                   numbers. -->
+              <exclude>**/.github/**/</exclude>
+              <exclude>.github/workflows/**</exclude>
+            </excludes>
+            <jackson>
+              <yamlFeatures>
+                <MINIMIZE_QUOTES>true</MINIMIZE_QUOTES>
+                <WRITE_DOC_START_MARKER>false</WRITE_DOC_START_MARKER>
+                <INDENT_ARRAYS_WITH_INDICATOR>true</INDENT_ARRAYS_WITH_INDICATOR>
+              </yamlFeatures>
+            </jackson>
+          </yaml>
+          <java>
+            <includes>
+              <include>src/main/java/**/*.java</include>
+              <include>src/test/java/**/*.java</include>
+            </includes>
+            <eclipse>
+              <file>${maven.multiModuleProjectDirectory}/formatting_conventions.xml</file>
+              <version>4.35</version>
+            </eclipse>
+            <removeUnusedImports/>
+            <importOrder>
+              <order>java,javax,org,com,at.phactum</order>
+            </importOrder>
+          </java>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <phase>process-sources</phase>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

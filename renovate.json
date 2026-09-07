@@ -1,0 +1,19 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "github>vanillabp/renovate-config"
+  ],
+  "timezone": "Europe/Vienna",
+  "packageRules": [
+    {
+      "description": "VanillaBP, the Business Cockpit and the BPMS adapters follow the framework, not Renovate: their versions are bumped when a release is cut, and while they are snapshots there is nothing to look up.",
+      "matchPackageNames": ["/^io\\.vanillabp/", "/^org\\.camunda\\.community\\.vanillabp/"],
+      "enabled": false
+    },
+    {
+      "description": "Camunda stays manual. Client and cluster are only guaranteed compatible at equal versions, and a cluster upgrade in a customer project takes its time, so a library must never force one.",
+      "matchPackageNames": ["/^io\\.camunda/", "/^org\\.camunda\\.bpm/"],
+      "enabled": false
+    }
+  ]
+}
