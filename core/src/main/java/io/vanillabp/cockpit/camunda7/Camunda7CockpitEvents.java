@@ -75,6 +75,15 @@ public class Camunda7CockpitEvents {
   }
 
   /**
+   * @return Which transaction the outbox entry of an event is written in
+   */
+  public EventTransaction transaction() {
+
+    return transaction;
+
+  }
+
+  /**
    * Reports what happened to one user task.
    *
    * @param task The task the engine handed to the listener

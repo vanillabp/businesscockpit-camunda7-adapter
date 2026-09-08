@@ -83,6 +83,14 @@
       <artifactId>migration-adapter</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <!-- the database a test builds a real engine on: what this module contributes to an
+        engine is only true of an engine which was built, and a mocked configuration answers
+        whatever it was taught -->
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>

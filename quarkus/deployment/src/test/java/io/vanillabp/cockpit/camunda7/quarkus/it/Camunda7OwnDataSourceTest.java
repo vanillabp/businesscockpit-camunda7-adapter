@@ -13,7 +13,8 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 import io.quarkus.test.QuarkusExtensionTest;
 import io.vanillabp.camunda7.quarkus.runtime.VanillaBpCamunda7Properties;
-import io.vanillabp.cockpit.camunda7.quarkus.Camunda7QuarkusSettings;
+import io.vanillabp.cockpit.camunda7.Camunda7CockpitCustomizer;
+import io.vanillabp.cockpit.extension.spi.EventTransaction;
 import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 import jakarta.inject.Inject;
 import jakarta.transaction.UserTransaction;
@@ -66,6 +67,9 @@ public class Camunda7OwnDataSourceTest {
   @Inject
   UserTransaction transaction;
 
+  @Inject
+  Camunda7CockpitCustomizer customizer;
+
   @Test
   @DisplayName("A workflow rolled back on an engine with a data source of its own is not reported")
   public void aRolledBackWorkflowIsNotReported() throws Exception {
@@ -96,8 +100,9 @@ public class Camunda7OwnDataSourceTest {
             .toList(),
         "the cockpit was told about a workflow the engine rolled back");
 
-    assertTrue(
-        new Camunda7QuarkusSettings(camunda7Properties).joinsTheApplicationTransaction(ADAPTER_ID),
+    assertEquals(
+        EventTransaction.CURRENT,
+        customizer.eventTransactionOf(ADAPTER_ID),
         "the entry of an observed event would be written outside the transaction the engine works in");
 
   }

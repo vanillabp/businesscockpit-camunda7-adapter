@@ -6,9 +6,12 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
+import org.camunda.bpm.engine.ProcessEngine;
 import org.camunda.bpm.engine.ProcessEngineConfiguration;
 import org.camunda.bpm.engine.impl.bpmn.parser.BpmnParseListener;
 import org.camunda.bpm.engine.impl.cfg.ProcessEngineConfigurationImpl;
+import org.camunda.bpm.engine.impl.cfg.ProcessEnginePlugin;
+import org.camunda.bpm.engine.impl.history.HistoryLevel;
 import org.camunda.bpm.engine.impl.history.handler.HistoryEventHandler;
 
 import io.vanillabp.camunda7.engine.Camunda7EngineCustomizer;
@@ -89,35 +92,95 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
   }
 
   /**
-   * The engine is about to be built, which is the last moment this extension sees what it will
-   * be built from - and the first at which it can say that the cockpit will stay empty.
+   * The engine is about to be built, and the one thing this extension has to know about it -
+   * how much history it will keep - is not settled yet: the <code>preInit</code> of every
+   * engine plugin of the application is still to come and may set another level, and
+   * <code>auto</code> names no level at all until the engine has read the one its database was
+   * created with. So nothing is decided here; a plugin is added which is asked once both have
+   * happened.
    */
   @Override
   public void customize(
       final String adapterId,
       final ProcessEngineConfigurationImpl configuration) {
 
-    failOnAHistoryLevelKeepingTooLittle(adapterId, configuration.getHistory());
+    configuration
+        .getProcessEnginePlugins()
+        .add(new HistoryLevelCheck(adapterId));
+
+  }
+
+  /**
+   * Asks the engine which history level it ended up with and ends the boot below
+   * <code>audit</code> - see decision 7 in the repository's DECISIONS.md.
+   * <p>
+   * A plugin rather than a line in {@link Camunda7CockpitCustomizer#customize}, because the
+   * level read while an engine is being customized is not the level that engine runs with: an
+   * application sets it in the <code>preInit</code> of a plugin of its own, and every one of
+   * those has run by the time the engine calls <code>postInit</code>.
+   */
+  private static final class HistoryLevelCheck implements ProcessEnginePlugin {
+
+    private final String adapterId;
+
+    private HistoryLevelCheck(
+        final String adapterId) {
+
+      this.adapterId = adapterId;
+
+    }
+
+    @Override
+    public void preInit(
+        final ProcessEngineConfigurationImpl configuration) {
+      // asking here would be asking before the plugins which set the level have run
+    }
+
+    /**
+     * Every plugin has had its say, so a level spelled out by name is settled - and settled
+     * before the engine has written anything, which is the earliest this can end a boot.
+     */
+    @Override
+    public void postInit(
+        final ProcessEngineConfigurationImpl configuration) {
+
+      failOnAHistoryLevelKeepingTooLittle(adapterId, configuration.getHistoryLevel());
+
+    }
+
+    /**
+     * And <code>auto</code>, which the engine resolves against its own database while it is
+     * built, is settled here.
+     */
+    @Override
+    public void postProcessEngineBuild(
+        final ProcessEngine engine) {
+
+      failOnAHistoryLevelKeepingTooLittle(
+          adapterId,
+          ((ProcessEngineConfigurationImpl) engine.getProcessEngineConfiguration())
+              .getHistoryLevel());
+
+    }
 
   }
 
   /**
    * Everything the cockpit shows comes out of the engine's history: a workflow's lifecycle is
    * read from the process-instance history events, and a task somebody completed before the
-   * report was dispatched is read from the historic task instance. Below
-   * <code>audit</code> the engine keeps neither, so the application would run and the cockpit
-   * would stay empty without anything saying why.
+   * report was dispatched is read from the historic task instance. Below <code>audit</code> the
+   * engine keeps neither, so the application would run and the cockpit would stay empty without
+   * anything saying why.
    *
    * @param adapterId The configured adapter id, for the message
-   * @param history What the engine was configured with. <code>auto</code> is passed: the
-   *          engine then takes the level its database was created with, which this cannot
-   *          read before the engine exists
+   * @param level What the engine settled on, or <code>null</code> while <code>auto</code> is
+   *          still unresolved
    */
   private static void failOnAHistoryLevelKeepingTooLittle(
       final String adapterId,
-      final String history) {
+      final HistoryLevel level) {
 
-    if ((history == null) || !HISTORY_LEVELS_KEEPING_TOO_LITTLE.contains(history)) {
+    if ((level == null) || !HISTORY_LEVELS_KEEPING_TOO_LITTLE.contains(level.getName())) {
       return;
     }
     throw new IllegalStateException(
@@ -131,7 +194,7 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
             plugin or by a Camunda7EngineCustomizer of this application - or take the Business \
             Cockpit extension out of the application."""
             .formatted(
-                adapterId, history, ProcessEngineConfiguration.HISTORY_AUDIT,
+                adapterId, level.getName(), ProcessEngineConfiguration.HISTORY_AUDIT,
                 ProcessEngineConfiguration.HISTORY_AUDIT, ProcessEngineConfiguration.HISTORY_FULL,
                 ProcessEngineConfiguration.HISTORY_DEFAULT));
 
@@ -163,6 +226,19 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
       final String adapterId) {
 
     return eventsOf(adapterId).scope();
+
+  }
+
+  /**
+   * @param adapterId The configured adapter id
+   * @return Which transaction the entries of that engine are written in - what the platform
+   *         answered for it, and with it whether a rolled-back workflow can leave a report
+   *         behind
+   */
+  public EventTransaction eventTransactionOf(
+      final String adapterId) {
+
+    return eventsOf(adapterId).transaction();
 
   }
 

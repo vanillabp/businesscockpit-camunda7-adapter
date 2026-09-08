@@ -135,8 +135,11 @@ dispatched is read from the historic task instance. At history level `none` the 
 neither, at `activity` it writes no task history, and an application configured that way would
 run with a cockpit which stays empty and says nothing about why.
 
-So the extension reads the level the engine is about to be built with and ends the boot below
-`audit`, naming the level it found, the two levels which work and the fact that the engine's own
-default is one of them. The level is not a key of this extension and not one of the Camunda 7
+So the extension asks the engine which level it ended up with and ends the boot below `audit`,
+naming the level it found, the two levels which work and the fact that the engine's own default is
+one of them. It asks through an engine plugin of its own rather than while it customizes the
+configuration: the customizers run before the plugins of the application, which is where a level is
+set, and `auto` names no level at all until the engine has read the one its database was created
+with. The level is not a key of this extension and not one of the Camunda 7
 adapter either: an application which sets it does so through an engine plugin or a customizer of
 its own, which is what the message points at.
