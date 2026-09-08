@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" id="CockpitDefinitions" targetNamespace="http://vanillabp.io/businesscockpit/camunda7">
+  <bpmn:process id="CockpitProcess" isExecutable="true">
+    <bpmn:startEvent id="Start">
+      <bpmn:outgoing>ToApprove</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:sequenceFlow id="ToApprove" sourceRef="Start" targetRef="Approve" />
+    <bpmn:userTask id="Approve" name="Approve the order" camunda:formKey="approve">
+      <bpmn:incoming>ToApprove</bpmn:incoming>
+      <bpmn:outgoing>ToEnd</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="ToEnd" sourceRef="Approve" targetRef="End" />
+    <bpmn:endEvent id="End">
+      <bpmn:incoming>ToEnd</bpmn:incoming>
+    </bpmn:endEvent>
+  </bpmn:process>
+  <bpmn:process id="MultiInstanceProcess" isExecutable="true">
+    <bpmn:startEvent id="MI_Start">
+      <bpmn:outgoing>MI_ToSign</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:sequenceFlow id="MI_ToSign" sourceRef="MI_Start" targetRef="MI_Sign" />
+    <bpmn:userTask id="MI_Sign" name="Sign the order" camunda:formKey="sign">
+      <bpmn:incoming>MI_ToSign</bpmn:incoming>
+      <bpmn:outgoing>MI_ToEnd</bpmn:outgoing>
+      <bpmn:multiInstanceLoopCharacteristics isSequential="false" camunda:collection="${signers}" camunda:elementVariable="signer" />
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="MI_ToEnd" sourceRef="MI_Sign" targetRef="MI_End" />
+    <bpmn:endEvent id="MI_End">
+      <bpmn:incoming>MI_ToEnd</bpmn:incoming>
+    </bpmn:endEvent>
+  </bpmn:process>
+</bpmn:definitions>

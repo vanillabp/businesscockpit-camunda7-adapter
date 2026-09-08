@@ -19,11 +19,13 @@
   <description>Business Cockpit integration for Camunda 7, built as a VanillaBP 2 extension.</description>
   <url>https://github.com/vanillabp/businesscockpit-camunda7-adapter</url>
 
-  <!-- No modules yet. The extension itself is written by story 36 and needs the cockpit's
-       extensions-commons artifact, which does not exist. What lands here then is the layout
-       every VanillaBP adapter repository has: core, spring-boot, quarkus/runtime,
-       quarkus/deployment and test-coverage-report. See README.md, section "What is here today". -->
-  <modules/>
+  <modules>
+    <module>core</module>
+    <module>spring-boot</module>
+    <module>quarkus</module>
+    <!-- last: it judges the reports the modules above produced -->
+    <module>test-coverage-report</module>
+  </modules>
 
   <scm>
     <connection>scm:git:https://github.com/vanillabp/businesscockpit-camunda7-adapter.git</connection>
@@ -46,15 +48,23 @@
     <maven.compiler.release>21</maven.compiler.release>
     <jacoco.version>0.8.15</jacoco.version>
     <lombok.version>1.18.46</lombok.version>
-    <spi-for-java.version>1.2.0-SNAPSHOT</spi-for-java.version>
     <adapter-platform.version>2.0.0-SNAPSHOT</adapter-platform.version>
     <!-- the VanillaBP Camunda 7 adapter this extension plugs into: it names the processing
          context the extension is wired with, and its engine is the one the extension adds its
          listeners to -->
     <camunda7-adapter.version>2.0.0-SNAPSHOT</camunda7-adapter.version>
     <camunda.version>7.24.0</camunda.version>
+    <!-- the Business Cockpit itself: extensions-commons is the platform-neutral half of
+         this extension and is consumed as a published artifact, never copied -->
+    <business-cockpit.version>0.4.1-SNAPSHOT</business-cockpit.version>
     <spring-boot.version>4.1.1</spring-boot.version>
     <quarkus.version>3.39.1</quarkus.version>
+    <!-- where the build stops, the same number in every VanillaBP repository -->
+    <coverage.threshold.spring-boot>85</coverage.threshold.spring-boot>
+    <coverage.threshold.quarkus>85</coverage.threshold.quarkus>
+    <!-- what a report is expected to show: reported every run, never asserted, so a bad
+         week is not answered by editing a number -->
+    <coverage.rule>90</coverage.rule>
   </properties>
 
   <dependencyManagement>
@@ -73,41 +83,62 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+      <!-- one place for every io.vanillabp coordinate of the Version 2 platform: the two
+           SPI artifacts an extension implements, the core runtime it reads its configuration
+           from, the platform integrations the per-platform modules register with, and the
+           test harness. The adapter SPI is for BPMS adapters and has no business here. -->
       <dependency>
         <groupId>io.vanillabp</groupId>
+        <artifactId>vanillabp-bom</artifactId>
+        <version>${adapter-platform.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- the platform-neutral half of this extension, and the two modules registering it
+           on Spring Boot and on Quarkus -->
+      <dependency>
+        <groupId>io.vanillabp.businesscockpit</groupId>
+        <artifactId>extensions-commons</artifactId>
+        <version>${business-cockpit.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.vanillabp.businesscockpit</groupId>
+        <artifactId>extensions-commons-spring-boot</artifactId>
+        <version>${business-cockpit.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.vanillabp.businesscockpit</groupId>
+        <artifactId>extensions-commons-quarkus</artifactId>
+        <version>${business-cockpit.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.vanillabp.businesscockpit</groupId>
+        <artifactId>extensions-commons-quarkus-deployment</artifactId>
+        <version>${business-cockpit.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.vanillabp.businesscockpit</groupId>
         <artifactId>spi-for-java</artifactId>
-        <version>${spi-for-java.version}</version>
-      </dependency>
-      <!-- what an extension implements: ExtensionWiringService. The adapter SPI is for BPMS
-           adapters and has no business in this repository. -->
-      <dependency>
-        <groupId>io.vanillabp</groupId>
-        <artifactId>vanillabp-extension-spi</artifactId>
-        <version>${adapter-platform.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.vanillabp</groupId>
-        <artifactId>vanillabp-spring-boot-integration</artifactId>
-        <version>${adapter-platform.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.vanillabp</groupId>
-        <artifactId>vanillabp-quarkus-integration</artifactId>
-        <version>${adapter-platform.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.vanillabp</groupId>
-        <artifactId>vanillabp-quarkus-integration-deployment</artifactId>
-        <version>${adapter-platform.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.vanillabp</groupId>
-        <artifactId>test-utils</artifactId>
-        <version>${adapter-platform.version}</version>
+        <version>${business-cockpit.version}</version>
       </dependency>
       <dependency>
         <groupId>org.camunda.community.vanillabp</groupId>
         <artifactId>camunda7-adapter</artifactId>
+        <version>${camunda7-adapter.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.camunda.community.vanillabp</groupId>
+        <artifactId>camunda7-adapter-spring-boot</artifactId>
+        <version>${camunda7-adapter.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.camunda.community.vanillabp</groupId>
+        <artifactId>camunda7-adapter-quarkus</artifactId>
+        <version>${camunda7-adapter.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.camunda.community.vanillabp</groupId>
+        <artifactId>camunda7-adapter-quarkus-deployment</artifactId>
         <version>${camunda7-adapter.version}</version>
       </dependency>
       <dependency>
