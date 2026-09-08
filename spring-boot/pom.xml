@@ -52,6 +52,13 @@
       <artifactId>migration-adapter</artifactId>
     </dependency>
     <dependency>
+      <!-- the platform's own registrar support, which answers which adapter ids of a type this
+        application configured; it arrives transitively as well, and is declared because the bean
+        registrar compiles against it -->
+      <groupId>io.vanillabp</groupId>
+      <artifactId>vanillabp-spring-boot-integration</artifactId>
+    </dependency>
+    <dependency>
       <!-- the adapter SPI, for the name-clash avoidance this module hands the customizer: it
         arrives transitively as well, and is declared because the auto-configuration compiles against it -->
       <groupId>io.vanillabp</groupId>

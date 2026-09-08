@@ -1,8 +1,6 @@
 package io.vanillabp.cockpit.camunda7.quarkus;
 
 import java.util.List;
-import java.util.Map;
-import java.util.TreeSet;
 
 import org.camunda.bpm.model.bpmn.BpmnModelInstance;
 
@@ -98,6 +96,14 @@ public class Camunda7CockpitProducer {
    * by the configuration, which a producer method cannot express. The cockpit's neutral half
    * collects both shapes, the same way VanillaBP's own Quarkus integration collects the
    * adapter deployment services of a BPMS adapter.
+   * <p>
+   * WHICH adapter ids those are is {@code MigrationAdapterProperties#adapterIdsOfType}, the same
+   * answer the Spring Boot half reads through the platform's registrar support. Filtering the
+   * configured types is not that answer: an id named in <code>prioritized-adapters</code> needs
+   * no section of its own, and an application which configured nothing at all has the id the
+   * classpath derives - so a migration setup and a single-dependency application are exactly the
+   * two cases where an extension answering it itself registers no bridge while the adapter
+   * registers fine.
    *
    * @param properties VanillaBP's resolved configuration, which names the configured adapters
    * @param engines The engines the Camunda 7 adapter built
@@ -114,7 +120,8 @@ public class Camunda7CockpitProducer {
       final Camunda7CockpitCustomizer customizer,
       final Camunda7WorkflowProcesses processes) {
 
-    return camunda7AdapterIds(properties)
+    return properties
+        .adapterIdsOfType(Camunda7Adapter.ADAPTER_TYPE)
         .stream()
         .<BusinessCockpitBpmsBridge>map(
             adapterId -> new Camunda7CockpitBridge(
@@ -122,26 +129,6 @@ public class Camunda7CockpitProducer {
                     .engineFor(adapterId)
                     .getProcessEngine()))
         .toList();
-
-  }
-
-  /**
-   * The adapter ids always come from the platform's own configuration rather than from the
-   * Camunda 7 adapter's overlay map, the same rule the adapter itself follows: an environment
-   * variable can materialize an overlay entry for an adapter nobody configured.
-   */
-  private static TreeSet<String> camunda7AdapterIds(
-      final MigrationAdapterProperties properties) {
-
-    final var adapterIds = new TreeSet<String>();
-    properties
-        .adapterTypes()
-        .entrySet()
-        .stream()
-        .filter(adapter -> Camunda7Adapter.ADAPTER_TYPE.equals(adapter.getValue()))
-        .map(Map.Entry::getKey)
-        .forEach(adapterIds::add);
-    return adapterIds;
 
   }
 

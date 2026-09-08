@@ -1,12 +1,8 @@
 package io.vanillabp.cockpit.camunda7.springboot;
 
-import java.util.TreeSet;
-
 import org.camunda.bpm.engine.ProcessEngine;
 import org.springframework.beans.factory.BeanRegistrar;
 import org.springframework.beans.factory.BeanRegistry;
-import org.springframework.boot.context.properties.bind.Bindable;
-import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.core.env.Environment;
 
 import io.vanillabp.camunda7.Camunda7Adapter;
@@ -15,7 +11,7 @@ import io.vanillabp.cockpit.camunda7.Camunda7CockpitBridge;
 import io.vanillabp.cockpit.camunda7.Camunda7CockpitCustomizer;
 import io.vanillabp.cockpit.camunda7.Camunda7WorkflowProcesses;
 import io.vanillabp.cockpit.extension.spi.BusinessCockpitBpmsBridge;
-import io.vanillabp.integration.adapter.migration.config.MigrationAdapterProperties;
+import io.vanillabp.integration.adapter.AdapterBeanRegistrarSupport;
 
 /**
  * Registers one Business Cockpit bridge per configured Camunda 7 adapter id.
@@ -27,6 +23,14 @@ import io.vanillabp.integration.adapter.migration.config.MigrationAdapterPropert
  * are element beans and never a bean of type <code>List</code>, because that is how the
  * cockpit's neutral half collects them on Spring Boot.
  * <p>
+ * WHICH adapter ids those are is the platform's answer
+ * ({@code AdapterBeanRegistrarSupport#forEachConfiguredAdapterId}), the same one the Camunda 7
+ * adapter registers its own beans for. Filtering the configured types is not that answer: an id
+ * named in <code>prioritized-adapters</code> needs no section of its own, and an application
+ * which configured nothing at all has the id the classpath derives - so a migration setup and a
+ * single-dependency application are exactly the two cases where an extension answering it
+ * itself registers no bridge while the adapter registers fine.
+ * <p>
  * The bean is supplied lazily: it needs the engine of its adapter id, and the engine is built
  * from the customizer this extension contributes.
  */
@@ -37,8 +41,10 @@ public class Camunda7CockpitBeanRegistrar implements BeanRegistrar {
       final BeanRegistry registry,
       final Environment environment) {
 
-    camunda7AdapterIds(environment)
-        .forEach(
+    AdapterBeanRegistrarSupport
+        .forEachConfiguredAdapterId(
+            environment,
+            Camunda7Adapter.ADAPTER_TYPE,
             adapterId -> registry
                 .registerBean(
                     "BusinessCockpit_Camunda7_Bridge_%s".formatted(adapterId),
@@ -50,33 +56,6 @@ public class Camunda7CockpitBeanRegistrar implements BeanRegistrar {
                                     .bean(Camunda7CockpitCustomizer.class)
                                     .scopeOf(adapterId), supplierContext.bean(
                                         Camunda7WorkflowProcesses.class), engineOf(supplierContext, adapterId)))));
-
-  }
-
-  /**
-   * The adapter ids always come from the platform's own configuration rather than from the
-   * Camunda 7 adapter's overlay map, the same rule the adapter itself follows: an environment
-   * variable can materialize an overlay entry for an adapter nobody configured.
-   */
-  private static Iterable<String> camunda7AdapterIds(
-      final Environment environment) {
-
-    final var properties = Binder
-        .get(environment)
-        .bind(MigrationAdapterProperties.PREFIX, Bindable.of(MigrationAdapterProperties.class))
-        .orElseGet(MigrationAdapterProperties::new);
-
-    final var adapterIds = new TreeSet<String>();
-    properties
-        .adapterTypes()
-        .forEach((
-            adapterId,
-            adapterType) -> {
-          if (Camunda7Adapter.ADAPTER_TYPE.equals(adapterType)) {
-            adapterIds.add(adapterId);
-          }
-        });
-    return adapterIds;
 
   }
 
@@ -93,11 +72,12 @@ public class Camunda7CockpitBeanRegistrar implements BeanRegistrar {
             () -> new IllegalStateException(
                 """
                     The Business Cockpit extension found no Camunda 7 engine for the adapter '%s', \
-                    although 'vanillabp.adapters.%s.type' says camunda7. Add the artifact \
+                    although VanillaBP counts that id among the Camunda 7 adapters of this \
+                    application. Add the artifact \
                     'org.camunda.community.vanillabp:camunda7-adapter-spring-boot' to your workflow \
                     module: this extension listens to the engines that adapter builds and has none \
                     of its own."""
-                    .formatted(adapterId, adapterId)))
+                    .formatted(adapterId)))
         .getProcessEngine();
 
   }
