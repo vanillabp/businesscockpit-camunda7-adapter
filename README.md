@@ -43,7 +43,8 @@ What the core does, class by class:
 - `Camunda7WorkflowProcesses` is that memory, and the way back from the identifiers an engine
   reports to the workflow module and the plain process id the application wrote.
 - `Camunda7CockpitCustomizer` is what the Camunda 7 adapter asks per configured adapter id: it
-  contributes the parse listener and the history event handler of that engine.
+  contributes the parse listener and the history event handler of that engine, and it ends the boot
+  of an engine whose history level writes none of what the cockpit reads back.
 - `Camunda7UserTaskParseListener` attaches `Camunda7UserTaskListener` to every user task, as a
   built-in listener of all four task events.
 - `Camunda7WorkflowHistoryHandler` turns the engine's process-instance history events into the

@@ -129,6 +129,12 @@ around here.
 
 ## 7. An engine keeping less history than `audit` ends the boot
 
+*Superseded by decision 8.* It named `audit` as the lowest level which works, on the assumption
+that `activity` writes no task history. It does:
+`org.camunda.bpm.engine.impl.history.HistoryLevelActivity` produces the task-instance events as
+well as the process-instance ones, and what `audit` adds is variable and form-property history,
+which the cockpit does not read.
+
 Everything the cockpit shows about a workflow comes from the engine's history: the lifecycle is
 read from the process-instance history events, and a task somebody finished before the report was
 dispatched is read from the historic task instance. At history level `none` the engine writes
@@ -143,3 +149,29 @@ set, and `auto` names no level at all until the engine has read the one its data
 with. The level is not a key of this extension and not one of the Camunda 7
 adapter either: an application which sets it does so through an engine plugin or a customizer of
 its own, which is what the message points at.
+
+## 8. An engine writing none of the history the cockpit reads ends the boot
+
+A workflow's lifecycle is what the engine wrote about the process instance, and a user task
+somebody finished before its report was dispatched is read back from what it wrote about the task
+instance. Camunda writes both from history level `activity` upwards; what `audit` adds on top is
+variable and form-property history, and the cockpit reads neither. So `activity` is the lowest
+level an application can run this extension on, and `none` is the only one of Camunda's own
+levels which leaves the cockpit with nothing.
+
+The candidates of a finished task are the one thing which does need more. They come from the
+identity-link log, which Camunda keeps at `full` alone, and below that such a task is reported
+without candidates rather than with wrong ones. That is a task shown with less detail, not a
+cockpit which stays empty, so it is no reason to end a boot.
+
+The check asks the level instead of comparing its name against a list. A history level is an
+object an application may bring along itself through `setCustomHistoryLevels`, and it answers per
+event type; asked with no entity it says whether it writes events of that type at all, which is
+exactly what is being asked here. A list of names would judge a level nobody but the application
+knows, and it would wave through a level called `activity` which somebody replaced with one
+writing less.
+
+Where an event the cockpit reads is missing, the boot ends with a message naming the engine's
+level, the events it does not write, the lowest level which writes them and the fact that the
+engine's own default already does - so an application which never touched the level will never
+see it.

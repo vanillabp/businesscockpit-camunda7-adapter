@@ -1,6 +1,7 @@
 package io.vanillabp.cockpit.camunda7.test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -12,6 +13,8 @@ import org.camunda.bpm.engine.ProcessEngine;
 import org.camunda.bpm.engine.impl.cfg.ProcessEngineConfigurationImpl;
 import org.camunda.bpm.engine.impl.cfg.ProcessEnginePlugin;
 import org.camunda.bpm.engine.impl.cfg.StandaloneInMemProcessEngineConfiguration;
+import org.camunda.bpm.engine.impl.history.HistoryLevel;
+import org.camunda.bpm.engine.impl.history.event.HistoryEventType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -113,9 +116,71 @@ public class Camunda7EngineCustomizingTest {
 
   }
 
+  /**
+   * What an application which brings a history level of its own writes. Camunda lets one be
+   * registered and named, which is why the extension asks a level what it writes instead of
+   * recognizing the four levels shipped with the engine by name.
+   */
+  private record AnApplicationBringing(HistoryLevel level) implements ProcessEnginePlugin {
+
+    @Override
+    public void preInit(
+        final ProcessEngineConfigurationImpl configuration) {
+
+      configuration.setCustomHistoryLevels(List.of(level));
+      configuration.setHistory(level.getName());
+
+    }
+
+    @Override
+    public void postInit(
+        final ProcessEngineConfigurationImpl configuration) {
+      // nothing, the level is set before the engine reads it
+    }
+
+    @Override
+    public void postProcessEngineBuild(
+        final ProcessEngine engine) {
+      // nothing, the level is set before the engine reads it
+    }
+
+  }
+
+  /**
+   * A level writing what the engine did to a process instance and nothing about its tasks. An
+   * id of its own, because the engine stores the id of the level its database was created with.
+   */
+  private record OnlyWhatHappenedToTheProcessInstance() implements HistoryLevel {
+
+    @Override
+    public int getId() {
+
+      return 42;
+
+    }
+
+    @Override
+    public String getName() {
+
+      return "process-instances-only";
+
+    }
+
+    @Override
+    public boolean isHistoryEventProduced(
+        final HistoryEventType eventType,
+        final Object entity) {
+
+      // 'process-instance' for a start and an end, 'process-instance-update' for an update
+      return eventType.getEntityType().startsWith("process-instance");
+
+    }
+
+  }
+
   @Test
-  @DisplayName("A plugin setting a history level which keeps too little ends the boot")
-  public void tooLittleHistoryEndsTheBoot() {
+  @DisplayName("A plugin switching the history off ends the boot")
+  public void anEngineWritingNoHistoryEndsTheBoot() {
 
     final var configuration = anEngineOf(
         "cockpit-history-none", new AnApplicationWanting("none"));
@@ -125,8 +190,10 @@ public class Camunda7EngineCustomizingTest {
 
     assertTrue(failure.getMessage().contains("none"), failure.getMessage());
     assertTrue(failure.getMessage().contains(ADAPTER_ID), failure.getMessage());
-    assertTrue(failure.getMessage().contains("audit"), failure.getMessage());
-    assertTrue(failure.getMessage().contains("full"), failure.getMessage());
+    // what is missing, and the lowest level which writes it
+    assertTrue(failure.getMessage().contains("PROCESS_INSTANCE_START"), failure.getMessage());
+    assertTrue(failure.getMessage().contains("TASK_INSTANCE_CREATE"), failure.getMessage());
+    assertTrue(failure.getMessage().contains("activity"), failure.getMessage());
     // the boot ends while the configuration is being initialized, so there is no half-built
     // engine left running against the database
     assertNull(configuration.getProcessEngine());
@@ -134,7 +201,44 @@ public class Camunda7EngineCustomizingTest {
   }
 
   @Test
-  @DisplayName("A plugin setting a history level which keeps enough is built")
+  @DisplayName("A level of its own which writes nothing about tasks ends the boot")
+  public void anEngineWritingNoTaskHistoryEndsTheBoot() {
+
+    final var configuration = anEngineOf(
+        "cockpit-history-own", new AnApplicationBringing(new OnlyWhatHappenedToTheProcessInstance()));
+
+    final var failure = assertThrows(
+        IllegalStateException.class, configuration::buildProcessEngine);
+
+    assertTrue(failure.getMessage().contains("process-instances-only"), failure.getMessage());
+    assertTrue(failure.getMessage().contains("TASK_INSTANCE_CREATE"), failure.getMessage());
+    // the lifecycle half of what the cockpit reads is written, so it is not among the complaints
+    assertFalse(failure.getMessage().contains("PROCESS_INSTANCE_START"), failure.getMessage());
+    assertNull(configuration.getProcessEngine());
+
+  }
+
+  @Test
+  @DisplayName("The lowest level writing what the cockpit reads is built")
+  public void anEngineWritingActivityHistoryIsBuilt() {
+
+    final var engine = anEngineOf("cockpit-history-activity", new AnApplicationWanting("activity"))
+        .buildProcessEngine();
+
+    try {
+      assertEquals(
+          "activity",
+          ((ProcessEngineConfigurationImpl) engine.getProcessEngineConfiguration())
+              .getHistoryLevel()
+              .getName());
+    } finally {
+      engine.close();
+    }
+
+  }
+
+  @Test
+  @DisplayName("A plugin setting a history level which keeps everything is built")
   public void enoughHistoryIsBuilt() {
 
     final var engine = anEngineOf("cockpit-history-full", new AnApplicationWanting("full"))
