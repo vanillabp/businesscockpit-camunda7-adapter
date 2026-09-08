@@ -2,10 +2,13 @@ package io.vanillabp.cockpit.camunda7;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
+import org.camunda.bpm.engine.ProcessEngineConfiguration;
 import org.camunda.bpm.engine.impl.bpmn.parser.BpmnParseListener;
+import org.camunda.bpm.engine.impl.cfg.ProcessEngineConfigurationImpl;
 import org.camunda.bpm.engine.impl.history.handler.HistoryEventHandler;
 
 import io.vanillabp.camunda7.engine.Camunda7EngineCustomizer;
@@ -28,6 +31,15 @@ import io.vanillabp.integration.adapter.spi.NameClashAvoidanceSupport;
  * of a migration stay apart all the way to the cockpit server.
  */
 public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
+
+  /**
+   * The history levels which keep too little for the cockpit. At <code>none</code> the engine
+   * writes no process-instance history at all, so a workflow never appears; at
+   * <code>activity</code> it writes no task history, so a task the engine has finished with is
+   * gone by the time the report is dispatched.
+   */
+  private static final Set<String> HISTORY_LEVELS_KEEPING_TOO_LITTLE = Set
+      .of(ProcessEngineConfiguration.HISTORY_NONE, ProcessEngineConfiguration.HISTORY_ACTIVITY);
 
   private final Camunda7WorkflowProcesses processes;
 
@@ -77,10 +89,59 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
   }
 
   /**
+   * The engine is about to be built, which is the last moment this extension sees what it will
+   * be built from - and the first at which it can say that the cockpit will stay empty.
+   */
+  @Override
+  public void customize(
+      final String adapterId,
+      final ProcessEngineConfigurationImpl configuration) {
+
+    failOnAHistoryLevelKeepingTooLittle(adapterId, configuration.getHistory());
+
+  }
+
+  /**
+   * Everything the cockpit shows comes out of the engine's history: a workflow's lifecycle is
+   * read from the process-instance history events, and a task somebody completed before the
+   * report was dispatched is read from the historic task instance. Below
+   * <code>audit</code> the engine keeps neither, so the application would run and the cockpit
+   * would stay empty without anything saying why.
+   *
+   * @param adapterId The configured adapter id, for the message
+   * @param history What the engine was configured with. <code>auto</code> is passed: the
+   *          engine then takes the level its database was created with, which this cannot
+   *          read before the engine exists
+   */
+  private static void failOnAHistoryLevelKeepingTooLittle(
+      final String adapterId,
+      final String history) {
+
+    if ((history == null) || !HISTORY_LEVELS_KEEPING_TOO_LITTLE.contains(history)) {
+      return;
+    }
+    throw new IllegalStateException(
+        """
+            The Business Cockpit observes the Camunda 7 engine of the adapter '%s', but that \
+            engine is configured with the history level '%s'. The cockpit reads a workflow's \
+            lifecycle from the engine's process-instance history and a finished user task from \
+            its task history, and neither is written below '%s': every workflow and every task \
+            completed before its report was sent would be missing. Configure the engine with \
+            '%s' or '%s' - the engine's default is '%s', so this level was set by an engine \
+            plugin or by a Camunda7EngineCustomizer of this application - or take the Business \
+            Cockpit extension out of the application."""
+            .formatted(
+                adapterId, history, ProcessEngineConfiguration.HISTORY_AUDIT,
+                ProcessEngineConfiguration.HISTORY_AUDIT, ProcessEngineConfiguration.HISTORY_FULL,
+                ProcessEngineConfiguration.HISTORY_DEFAULT));
+
+  }
+
+  /**
    * @param adapterId The configured adapter id
    * @return What this engine reports through, built once per engine
    */
-  public Camunda7CockpitEvents eventsOf(
+  private Camunda7CockpitEvents eventsOf(
       final String adapterId) {
 
     return eventsByAdapterId
@@ -106,18 +167,19 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
   }
 
   /**
-   * An engine sharing the application's data source runs its listeners inside the
-   * application's transaction, and the outbox entry belongs in that one: the cockpit then
-   * hears about a task if and only if the workflow which created it was committed. An engine
-   * on a data source of its own commits on its own, so there is no such transaction to join -
-   * see decision 5 in the repository's DECISIONS.md.
+   * Where the engine's work happens inside the application's transaction, the outbox entry
+   * belongs in that one: the cockpit then hears about a task if and only if the workflow which
+   * created it was committed. Where it does not, there is no such transaction to join and the
+   * entry gets one of its own. Which of the two an engine is doing is a question about the
+   * platform's transaction integration rather than about a single property, so the platform
+   * modules answer it - see decision 6 in the repository's DECISIONS.md.
    */
   private EventTransaction transactionOf(
       final String adapterId) {
 
-    return settings.runsOnItsOwnDataSource(adapterId)
-        ? EventTransaction.NEW
-        : EventTransaction.CURRENT;
+    return settings.joinsTheApplicationTransaction(adapterId)
+        ? EventTransaction.CURRENT
+        : EventTransaction.NEW;
 
   }
 

@@ -51,6 +51,12 @@
       <artifactId>vanillabp-extension-spi</artifactId>
     </dependency>
     <dependency>
+      <!-- the adapter SPI, for the name-clash avoidance an adapter is handed: this module asks
+        it what an engine calls a process rather than building the name itself -->
+      <groupId>io.vanillabp</groupId>
+      <artifactId>vanillabp-adapter-spi</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.camunda.bpm</groupId>
       <artifactId>camunda-engine</artifactId>
     </dependency>
@@ -68,6 +74,13 @@
         Mockito the engine's own types are stood in with -->
       <groupId>io.vanillabp</groupId>
       <artifactId>test-utils</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <!-- the core's own name-clash avoidance, so a test asks the real one what an engine calls
+        a process instead of teaching a double to answer -->
+      <groupId>io.vanillabp.adapter</groupId>
+      <artifactId>migration-adapter</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

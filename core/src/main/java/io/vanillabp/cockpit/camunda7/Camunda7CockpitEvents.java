@@ -28,9 +28,9 @@ import io.vanillabp.cockpit.extension.spi.WorkflowReference;
  * engine is in the middle of a transaction and a listener which talks to a server holds that
  * transaction open for as long as the server takes.
  * <p>
- * The entry is written in the transaction the engine is in, so it becomes visible if and only
- * if what the engine did was committed. An engine on a data source of its own has no such
- * transaction to join, and the entry then gets one of its own.
+ * The entry is written in the transaction the engine's work happens in, so it becomes visible
+ * if and only if that work was committed. An engine which commits on its own has no such
+ * transaction to share, and the entry then gets one of its own.
  */
 public class Camunda7CockpitEvents {
 
@@ -162,18 +162,17 @@ public class Camunda7CockpitEvents {
 
   /**
    * The instance a business case is: a task of an embedded subprocess, of a parallel branch or
-   * of a called process belongs to the workflow its whole hierarchy hangs below.
+   * of a called process belongs to the workflow its whole hierarchy hangs below. The engine
+   * records that instance on every execution; a workflow started before it kept that column
+   * falls back to the instance the task runs in.
    */
   private static String rootProcessInstanceIdOf(
       final ExecutionEntity execution) {
 
-    var root = execution;
-    while ((root.getParentId() != null) || (root.getSuperExecution() != null)) {
-      root = root.getSuperExecution() != null
-          ? root.getSuperExecution()
-          : root.getParent();
-    }
-    return root.getProcessInstanceId();
+    final var root = execution.getRootProcessInstanceId();
+    return root == null
+        ? execution.getProcessInstanceId()
+        : root;
 
   }
 

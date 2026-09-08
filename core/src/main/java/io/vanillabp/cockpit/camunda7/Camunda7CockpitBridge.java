@@ -3,15 +3,17 @@ package io.vanillabp.cockpit.camunda7;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.Date;
-import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import org.camunda.bpm.engine.ProcessEngine;
 import org.camunda.bpm.engine.history.HistoricProcessInstance;
 import org.camunda.bpm.engine.history.HistoricTaskInstance;
+import org.camunda.bpm.engine.impl.cfg.ProcessEngineConfigurationImpl;
 import org.camunda.bpm.engine.repository.ProcessDefinition;
 import org.camunda.bpm.engine.task.IdentityLinkType;
 import org.camunda.bpm.engine.task.Task;
@@ -38,6 +40,12 @@ import io.vanillabp.cockpit.extension.spi.WorkflowReference;
  * happened.
  */
 public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
+
+  /**
+   * What the engine writes as the operation of an identity-link log entry when a candidate was
+   * added; anything else in that column took one away. The engine's API names neither.
+   */
+  private static final String IDENTITY_LINK_ADDED = "add";
 
   private final Camunda7Scope scope;
 
@@ -79,23 +87,25 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
   public Optional<UserTaskDetailsPrefill> prefilledUserTaskDetails(
       final UserTaskReference userTask) {
 
-    final var task = engine
-        .getTaskService()
-        .createTaskQuery()
-        .taskId(userTask.userTaskId())
-        .initializeFormKeys()
-        .singleResult();
-    if (task != null) {
-      return Optional.of(prefillOf(task, userTask.bpmnProcessId()));
-    }
-    final var historic = engine
-        .getHistoryService()
-        .createHistoricTaskInstanceQuery()
-        .taskId(userTask.userTaskId())
-        .singleResult();
-    return Optional
-        .ofNullable(historic)
-        .map(gone -> prefillOf(gone, userTask.bpmnProcessId()));
+    return inOneEngineCommand(() -> {
+      final var task = engine
+          .getTaskService()
+          .createTaskQuery()
+          .taskId(userTask.userTaskId())
+          .initializeFormKeys()
+          .singleResult();
+      if (task != null) {
+        return Optional.of(prefillOf(task, userTask.bpmnProcessId()));
+      }
+      final var historic = engine
+          .getHistoryService()
+          .createHistoricTaskInstanceQuery()
+          .taskId(userTask.userTaskId())
+          .singleResult();
+      return Optional
+          .ofNullable(historic)
+          .map(gone -> prefillOf(gone, userTask.bpmnProcessId()));
+    });
 
   }
 
@@ -103,14 +113,18 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
   public Optional<WorkflowDetailsPrefill> prefilledWorkflowDetails(
       final WorkflowReference workflow) {
 
-    return Optional
-        .ofNullable(historicWorkflow(workflow.workflowId()))
-        .map(
-            instance -> new WorkflowDetailsPrefill(
-                versionOf(definitionOf(instance.getProcessDefinitionId())), instance
-                    .getBusinessKey(), processNameOf(
-                        definitionOf(instance.getProcessDefinitionId()),
-                        workflow.bpmnProcessId()), instance.getStartUserId()));
+    return inOneEngineCommand(() -> {
+      final var instance = historicWorkflow(workflow.workflowId());
+      if (instance == null) {
+        return Optional.empty();
+      }
+      final var definition = definitionOf(instance.getProcessDefinitionId());
+      return Optional
+          .of(
+              new WorkflowDetailsPrefill(
+                  versionOf(definition), instance.getBusinessKey(), processNameOf(
+                      definition, workflow.bpmnProcessId()), instance.getStartUserId()));
+    });
 
   }
 
@@ -163,13 +177,15 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
     if ((userTaskIds != null) && !userTaskIds.isEmpty()) {
       query = query.taskIdIn(userTaskIds.toArray(String[]::new));
     }
+    final var tasksOfTheAggregate = query;
 
-    return query
-        .list()
-        .stream()
-        .map(this::referenceOf)
-        .flatMap(Optional::stream)
-        .toList();
+    return inOneEngineCommand(
+        () -> tasksOfTheAggregate
+            .list()
+            .stream()
+            .map(task -> referenceOf(task, workflowModuleId, workflowAggregateId))
+            .flatMap(Optional::stream)
+            .toList());
 
   }
 
@@ -192,17 +208,30 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
     query = tenantId != null
         ? query.tenantIdIn(tenantId)
         : query.withoutTenantId();
+    final var theTask = query;
 
-    return Optional.ofNullable(query.singleResult()).flatMap(this::referenceOf);
+    return inOneEngineCommand(
+        () -> Optional
+            .ofNullable(theTask.singleResult())
+            .flatMap(task -> referenceOf(task, workflowModuleId, workflowAggregateId)));
 
   }
 
   /**
-   * A running task as the cockpit addresses it. Its BPMN process has to be one this
-   * application deployed, or the task belongs to something else running on the same engine.
+   * A running task as the cockpit addresses it. Its BPMN process has to be one the asking
+   * workflow module deployed: under <code>none</code> and under <code>use-prefix</code> no
+   * tenant separates the modules of an application, so a business key which two of them use
+   * would otherwise answer one module's question with another module's task.
+   *
+   * @param task The task the engine answered with
+   * @param workflowModuleId The workflow module which was asked about
+   * @param workflowAggregateId The aggregate which was asked about, which is the business key
+   *          every one of these queries filtered on
    */
   private Optional<UserTaskReference> referenceOf(
-      final Task task) {
+      final Task task,
+      final String workflowModuleId,
+      final String workflowAggregateId) {
 
     final var definition = definitionOf(task.getProcessDefinitionId());
     if (definition == null) {
@@ -210,11 +239,12 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
     }
     return processes
         .resolve(scope, definition.getTenantId(), definition.getKey())
+        .filter(process -> process.workflowModuleId().equals(workflowModuleId))
         .map(
             process -> new UserTaskReference(
-                scope.adapterId(), process.workflowModuleId(), process.bpmnProcessId(), businessKeyOf(
-                    task.getProcessInstanceId()), rootWorkflowIdOf(task.getProcessInstanceId()), task
-                        .getId(), taskDefinitionOf(
+                scope.adapterId(), process.workflowModuleId(), process
+                    .bpmnProcessId(), workflowAggregateId, rootWorkflowIdOf(
+                        task.getProcessInstanceId()), task.getId(), taskDefinitionOf(
                             task.getFormKey(), task.getTaskDefinitionKey()), task.getTaskDefinitionKey()));
 
   }
@@ -248,8 +278,9 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
   }
 
   /**
-   * A task the engine has finished with. History records what the task looked like, but not
-   * who its candidates were nor which variables it saw, and the cockpit reports what there is.
+   * A task the engine has finished with. History records what the task looked like and, where
+   * the engine keeps an identity-link log, who its candidates were; the variables it saw are
+   * not read, and a details provider of such a task therefore sees none.
    */
   private UserTaskDetailsPrefill prefillOf(
       final HistoricTaskInstance task,
@@ -257,6 +288,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
 
     final var definition = definitionOf(task.getProcessDefinitionId());
     final var workflow = historicWorkflow(task.getProcessInstanceId());
+    final var candidates = historicCandidatesOf(task.getId());
 
     return UserTaskDetailsPrefill
         .builder()
@@ -268,6 +300,8 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         .businessId(workflow == null ? null : workflow.getBusinessKey())
         .initiator(workflow == null ? null : workflow.getStartUserId())
         .assignee(task.getAssignee())
+        .candidateUsers(candidates.users())
+        .candidateGroups(candidates.groups())
         .dueDate(atOffset(task.getDueDate()))
         .followUpDate(atOffset(task.getFollowUpDate()))
         .build();
@@ -275,28 +309,35 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
   }
 
   /**
-   * Every variable the task can see, which is what a <code>&#64;TaskParam</code> parameter of a
-   * details provider is bound from.
+   * Everything a prefill reads, in one engine command.
    * <p>
-   * A variable somebody set to <code>null</code> is dropped rather than carried: a parameter
-   * bound from a variable which is not there receives <code>null</code> anyway, and the record
-   * carrying these to the details provider does not take null values.
+   * A task, its process instance, its identity links, its variables and its execution tree are
+   * five questions, and each of them opens a command of its own when it is asked through the
+   * engine's services. The engine reuses a command context which is already open, so wrapping
+   * them makes the five share one session and one transaction instead of taking one apiece.
+   *
+   * @param reads What is to be read while that command is open
+   * @return Whatever those reads produced
+   */
+  private <T> T inOneEngineCommand(
+      final Supplier<T> reads) {
+
+    return ((ProcessEngineConfigurationImpl) engine.getProcessEngineConfiguration())
+        .getCommandExecutorTxRequired()
+        .execute(commandContext -> reads.get());
+
+  }
+
+  /**
+   * Every variable the task can see, which is what a <code>&#64;TaskParam</code> parameter of a
+   * details provider is bound from. A variable somebody set to <code>null</code> is handed over
+   * as it is: the cockpit's neutral half binds the parameter to what the engine says, and a
+   * variable dropped here would be indistinguishable from one nobody ever set.
    */
   private Map<String, Object> variablesOf(
       final String taskId) {
 
-    final var variables = new LinkedHashMap<String, Object>();
-    engine
-        .getTaskService()
-        .getVariables(taskId)
-        .forEach((
-            name,
-            value) -> {
-          if (value != null) {
-            variables.put(name, value);
-          }
-        });
-    return variables;
+    return engine.getTaskService().getVariables(taskId);
 
   }
 
@@ -327,6 +368,46 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
 
   }
 
+  /**
+   * Who was a candidate for a task the engine no longer holds. The engine keeps a log of the
+   * identity links it added and removed only at history level <code>full</code>; below that
+   * the log is empty and a finished task is reported without candidates rather than with wrong
+   * ones. Where there is a log, it is replayed in the order the engine wrote it, so a candidate
+   * somebody took away again is not reported as one.
+   */
+  private Candidates historicCandidatesOf(
+      final String taskId) {
+
+    final var users = new LinkedHashSet<String>();
+    final var groups = new LinkedHashSet<String>();
+    engine
+        .getHistoryService()
+        .createHistoricIdentityLinkLogQuery()
+        .taskId(taskId)
+        .type(IdentityLinkType.CANDIDATE)
+        .orderByTime()
+        .asc()
+        .list()
+        .forEach(entry -> {
+          final var named = entry.getGroupId() != null
+              ? groups
+              : users;
+          final var candidate = entry.getGroupId() != null
+              ? entry.getGroupId()
+              : entry.getUserId();
+          if (candidate == null) {
+            return;
+          }
+          if (IDENTITY_LINK_ADDED.equals(entry.getOperationType())) {
+            named.add(candidate);
+          } else {
+            named.remove(candidate);
+          }
+        });
+    return new Candidates(List.copyOf(users), List.copyOf(groups));
+
+  }
+
   private HistoricProcessInstance historicWorkflow(
       final String processInstanceId) {
 
@@ -337,16 +418,6 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
             .createHistoricProcessInstanceQuery()
             .processInstanceId(processInstanceId)
             .singleResult();
-
-  }
-
-  private String businessKeyOf(
-      final String processInstanceId) {
-
-    final var workflow = historicWorkflow(processInstanceId);
-    return workflow == null
-        ? null
-        : workflow.getBusinessKey();
 
   }
 

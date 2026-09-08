@@ -280,6 +280,8 @@ public class Camunda7CockpitTest {
         .createProcessInstanceByKey(TestWorkflowService.MULTI_INSTANCE_PROCESS_ID)
         .processDefinitionTenantId(MODULE_ID)
         .businessKey(String.valueOf(aggregate.getId()))
+        // a variable of the process instance, which the multi-instance executions run below
+        .setVariable(TestWorkflowService.ORDER_KIND_VARIABLE, "express")
         .execute();
 
     final var bodies = awaitSignedTasks();
@@ -288,6 +290,13 @@ public class Camunda7CockpitTest {
     assertTrue(
         bodies.stream().anyMatch(body -> body.contains("\"signer\":\"cleo\"")), bodies.toString());
     bodies.forEach(body -> assertTrue(body.contains("\"total\":\"3\""), body));
+
+    // '@TaskParam' is bound from every variable the task can see: the one its own execution
+    // holds and the one of the process instance enclosing it
+    assertTrue(
+        bodies.stream().anyMatch(body -> body.contains("\"signerVariable\":\"anna\"")),
+        bodies.toString());
+    bodies.forEach(body -> assertTrue(body.contains("\"orderKind\":\"express\""), body));
 
   }
 

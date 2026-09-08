@@ -38,8 +38,9 @@ public class Camunda7WorkflowProcesses {
   }
 
   /**
-   * Joins the two halves of an engine identity. A blank is legal in neither a Camunda tenant
-   * id nor a process definition key, so no pair of halves can be mistaken for another.
+   * Joins the two halves of an engine identity. A process definition key is a BPMN process id
+   * and carries no blank, so the key is always what stands behind the last blank and no pair of
+   * halves can be read as another pair.
    */
   private static final String SEPARATOR = " ";
 
@@ -61,15 +62,6 @@ public class Camunda7WorkflowProcesses {
     if (processes.add(new WorkflowProcess(workflowModuleId, bpmnProcessId))) {
       byEngineIdentity.clear();
     }
-
-  }
-
-  /**
-   * @return Every process registered so far
-   */
-  public Set<WorkflowProcess> registered() {
-
-    return Set.copyOf(processes);
 
   }
 

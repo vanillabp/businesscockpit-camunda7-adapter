@@ -28,7 +28,9 @@ behind the ones VanillaBP attached itself. That order matters when a task is com
 own listener runs the `@WorkflowTask` method, which may change the workflow aggregate, and the
 details provider the cockpit invokes afterwards is meant to see the changed one.
 
-Held by `Camunda7CockpitTest#theCockpitListenersRunLastAndAreBuiltIn` on both platforms.
+Both platforms have a test which reads the parsed task definition of a deployed process and
+insists that all four events carry a built-in listener of the cockpit, and that it is the last
+one of them.
 
 ## 2. Every user task is reported, whether or not the application enriches it
 
@@ -80,6 +82,9 @@ release.
 
 ## 5. The outbox entry is written in the engine's transaction, unless the engine has its own
 
+*Superseded by decision 6.* It read the data source name as the answer to a question about
+transactions, which is wrong on Quarkus.
+
 An embedded Camunda 7 engine on the application's data source runs its listeners inside the
 application's transaction. The entry reporting what the engine did is written in that same
 transaction, so the cockpit hears about a task if and only if the workflow which created it was
@@ -91,3 +96,47 @@ than a correct one: the entry and the engine's work then commit separately, and 
 the two can leave the cockpit told about something the engine rolled back, or the other way round.
 The engine's own transaction is the only place that could be fixed, and an engine which does not
 share the application's data source has no such place.
+
+## 6. Which transaction the entry is written in is answered by the platform, not by a property
+
+The entry reporting what the engine did belongs in the transaction that work happens in: the
+cockpit then hears about a task if and only if the workflow which created it was committed, and a
+rolled-back workflow leaves nothing behind. Whether such a transaction exists is decided by how a
+platform ties its engine into transactions, and only the platform modules of this repository know
+that, so they answer it and the platform-neutral half asks.
+
+On Spring Boot an engine on the application's data source is built with the application's own
+transaction manager and its commands run in the application's transaction; an engine which was
+given `vanillabp.adapters.<id>.data-source-name` is built with a transaction manager of its own,
+and its commands commit without the application noticing. There the entry gets a transaction of
+its own, which is the honest answer rather than a correct one: entry and engine work then commit
+separately, and a crash between the two can leave the cockpit told about something the engine
+rolled back.
+
+On Quarkus the adapter builds the engine on the engine's JTA configuration with the container's
+transaction manager, so every command joins the transaction of whoever called it - including the
+engine of an adapter id which names a data source of its own. A named data source decides which
+database the engine writes to and nothing about who commits it. Reading that key here, as
+decision 5 did, would open a second transaction for the entry while the engine's own work is
+still uncommitted, and a rollback would leave the cockpit showing a task which never existed.
+
+What that costs an application which gives its Quarkus engine a database of its own: the entry
+and the engine's work are then two data sources in one JTA transaction, and Agroal enlists a
+second data source only as an XA resource. Both have to be configured with
+`quarkus.datasource.<name>.jdbc.transactions: xa`, or writing the entry fails while the engine
+works. That is the price of the guarantee, and it is named in the wiki rather than worked
+around here.
+
+## 7. An engine keeping less history than `audit` ends the boot
+
+Everything the cockpit shows about a workflow comes from the engine's history: the lifecycle is
+read from the process-instance history events, and a task somebody finished before the report was
+dispatched is read from the historic task instance. At history level `none` the engine writes
+neither, at `activity` it writes no task history, and an application configured that way would
+run with a cockpit which stays empty and says nothing about why.
+
+So the extension reads the level the engine is about to be built with and ends the boot below
+`audit`, naming the level it found, the two levels which work and the fact that the engine's own
+default is one of them. The level is not a key of this extension and not one of the Camunda 7
+adapter either: an application which sets it does so through an engine plugin or a customizer of
+its own, which is what the message points at.

@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.camunda.bpm.engine.ProcessEngine;
+import org.camunda.bpm.engine.impl.bpmn.behavior.MultiInstanceActivityBehavior;
 import org.camunda.bpm.engine.impl.cfg.ProcessEngineConfigurationImpl;
 import org.camunda.bpm.engine.impl.persistence.entity.ExecutionEntity;
 import org.camunda.bpm.model.bpmn.instance.Activity;
@@ -13,6 +14,7 @@ import org.camunda.bpm.model.bpmn.instance.MultiInstanceLoopCharacteristics;
 import org.camunda.bpm.model.xml.ModelInstance;
 import org.camunda.bpm.model.xml.instance.ModelElementInstance;
 
+import io.vanillabp.camunda7.deployment.Camunda7DeploymentService;
 import io.vanillabp.integration.extension.spi.handler.HandlerMultiInstance;
 
 /**
@@ -31,6 +33,14 @@ import io.vanillabp.integration.extension.spi.handler.HandlerMultiInstance;
  * parameters, which is the same thing it sees for a task that never had any.
  */
 public final class Camunda7MultiInstances {
+
+  /**
+   * The attribute naming the variable each instance gets its item in. It is read
+   * namespace-generically rather than through the typed getter of the Camunda model API: the
+   * Camunda 7 forks renamed those getters along with their packages, and an attribute read by
+   * namespace and name survives that rename.
+   */
+  private static final String ELEMENT_VARIABLE_ATTRIBUTE = "elementVariable";
 
   private Camunda7MultiInstances() {
   }
@@ -98,14 +108,16 @@ public final class Camunda7MultiInstances {
         .getLoopCharacteristics() instanceof final MultiInstanceLoopCharacteristics loop)) {
       return Optional.empty();
     }
-    final var index = execution.getVariable("loopCounter");
-    final var total = execution.getVariable("nrOfInstances");
+    final var index = execution.getVariable(MultiInstanceActivityBehavior.LOOP_COUNTER);
+    final var total = execution.getVariable(MultiInstanceActivityBehavior.NUMBER_OF_INSTANCES);
     if (!(index instanceof final Integer itemNo) || !(total instanceof final Integer totalCount)) {
       return Optional.empty();
     }
-    final var item = loop.getCamundaElementVariable() == null
+    final var elementVariable = loop
+        .getAttributeValueNs(Camunda7DeploymentService.CAMUNDA_NS, ELEMENT_VARIABLE_ATTRIBUTE);
+    final var item = elementVariable == null
         ? null
-        : execution.getVariable(loop.getCamundaElementVariable());
+        : execution.getVariable(elementVariable);
     return Optional
         .of(
             Map

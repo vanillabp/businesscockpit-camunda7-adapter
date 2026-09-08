@@ -83,10 +83,12 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
-      <!-- one place for every io.vanillabp coordinate of the Version 2 platform: the two
-           SPI artifacts an extension implements, the core runtime it reads its configuration
-           from, the platform integrations the per-platform modules register with, and the
-           test harness. The adapter SPI is for BPMS adapters and has no business here. -->
+      <!-- one place for every io.vanillabp coordinate of the Version 2 platform: the SPI an
+           extension implements, the core runtime it reads its configuration from, the platform
+           integrations the per-platform modules register with, and the test harness. The
+           adapter SPI is in here as well, although it is written for BPMS adapters: it carries
+           the name-clash avoidance, and the extension has to spell a process id the way the
+           engine of a workflow module stores it. -->
       <dependency>
         <groupId>io.vanillabp</groupId>
         <artifactId>vanillabp-bom</artifactId>

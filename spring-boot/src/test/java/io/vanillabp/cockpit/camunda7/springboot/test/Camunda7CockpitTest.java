@@ -355,6 +355,8 @@ public class Camunda7CockpitTest {
         .createProcessInstanceByKey(TestWorkflowService.MULTI_INSTANCE_PROCESS_ID)
         .processDefinitionTenantId(MODULE_ID)
         .businessKey(String.valueOf(aggregate.getId()))
+        // a variable of the process instance, which the multi-instance executions run below
+        .setVariable(TestWorkflowService.ORDER_KIND_VARIABLE, "express")
         .execute();
 
     final var bodies = awaitSignedTasks();
@@ -363,6 +365,13 @@ public class Camunda7CockpitTest {
     assertTrue(
         bodies.stream().anyMatch(body -> body.contains("\"signer\":\"cleo\"")), bodies.toString());
     bodies.forEach(body -> assertTrue(body.contains("\"total\":\"3\""), body));
+
+    // '@TaskParam' is bound from every variable the task can see: the one its own execution
+    // holds and the one of the process instance enclosing it
+    assertTrue(
+        bodies.stream().anyMatch(body -> body.contains("\"signerVariable\":\"anna\"")),
+        bodies.toString());
+    bodies.forEach(body -> assertTrue(body.contains("\"orderKind\":\"express\""), body));
 
   }
 
@@ -530,6 +539,27 @@ public class Camunda7CockpitTest {
     assertFalse(
         created.getFirst() instanceof Camunda7UserTaskListener,
         "the cockpit's listener runs first: %s".formatted(created));
+
+  }
+
+  @Test
+  @DisplayName("An operator skipping the custom listeners still gets the task and the workflow cancelled")
+  public void skippingTheCustomListenersStillReportsTheCancellation() {
+
+    final var aggregate = aStartedWorkflow("Olga");
+    final var userTaskId = userTaskIdOf(aggregate);
+    CockpitServer.awaitRequest("/usertask/created");
+
+    final var workflowId = workflowIdOf(aggregate);
+    // what the Camunda web application does when an operator deletes a case: the listeners of
+    // the model are skipped because they belong to the process, and the cockpit is not part of
+    // the process - so its own listeners are built-in and run anyway
+    engine
+        .getRuntimeService()
+        .deleteProcessInstance(workflowId, "an operator deleted it", true);
+
+    CockpitServer.awaitRequest("/usertask/%s/cancelled".formatted(userTaskId));
+    CockpitServer.awaitRequest("/workflow/%s/cancelled".formatted(workflowId));
 
   }
 

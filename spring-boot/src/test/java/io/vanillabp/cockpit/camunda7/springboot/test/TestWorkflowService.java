@@ -18,6 +18,7 @@ import io.vanillabp.spi.service.BpmnProcess;
 import io.vanillabp.spi.service.MultiInstanceElement;
 import io.vanillabp.spi.service.MultiInstanceIndex;
 import io.vanillabp.spi.service.MultiInstanceTotal;
+import io.vanillabp.spi.service.TaskParam;
 import io.vanillabp.spi.service.WorkflowService;
 
 /**
@@ -48,6 +49,15 @@ public class TestWorkflowService {
 
   /** The BPMN element the multi-instance context is keyed by. */
   public static final String MULTI_INSTANCE_ELEMENT = "MI_Sign";
+
+  /** The variable each instance of the multi-instance task gets its signer in. */
+  public static final String SIGNER_VARIABLE = "signer";
+
+  /**
+   * A variable of the process instance rather than of one multi-instance execution: what a
+   * <code>&#64;TaskParam</code> of an enclosing scope is bound from.
+   */
+  public static final String ORDER_KIND_VARIABLE = "orderKind";
 
   /** What the details provider writes into the aggregate, so that a test can see it ran. */
   public static final String APPROVE_NOTE = "seen by the details provider";
@@ -119,6 +129,9 @@ public class TestWorkflowService {
    * @param signer The item this instance is for
    * @param index Which instance this is
    * @param total How many there are
+   * @param signerVariable The same item, read as the variable the engine set it in
+   * @param orderKind A variable of the process instance, which is a scope enclosing the one
+   *          this task runs in
    * @return The enriched details
    */
   @UserTaskDetailsProvider(taskDefinition = SIGN_TASK_DEFINITION)
@@ -126,11 +139,18 @@ public class TestWorkflowService {
       final PrefilledUserTaskDetails prefilled,
       @MultiInstanceElement(MULTI_INSTANCE_ELEMENT) final String signer,
       @MultiInstanceIndex(MULTI_INSTANCE_ELEMENT) final int index,
-      @MultiInstanceTotal(MULTI_INSTANCE_ELEMENT) final int total) {
+      @MultiInstanceTotal(MULTI_INSTANCE_ELEMENT) final int total,
+      @TaskParam(SIGNER_VARIABLE) final String signerVariable,
+      @TaskParam(ORDER_KIND_VARIABLE) final String orderKind) {
 
     prefilled
         .setDetails(
-            Map.of("signer", signer, "index", String.valueOf(index), "total", String.valueOf(total)));
+            Map
+                .of(
+                    "signer", signer, "index", String.valueOf(index), "total", String
+                        .valueOf(total),
+                    "signerVariable", String.valueOf(signerVariable), "orderKind", String
+                        .valueOf(orderKind)));
     return prefilled;
 
   }

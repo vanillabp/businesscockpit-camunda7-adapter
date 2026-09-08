@@ -9,7 +9,7 @@ import static org.mockito.Mockito.when;
 import java.time.OffsetDateTime;
 import java.util.Date;
 import java.util.List;
-import java.util.Set;
+import java.util.Optional;
 
 import org.camunda.bpm.engine.delegate.DelegateTask;
 import org.camunda.bpm.engine.delegate.TaskListener;
@@ -30,6 +30,8 @@ import io.vanillabp.cockpit.camunda7.Camunda7WorkflowProcesses;
 import io.vanillabp.cockpit.extension.spi.EventTransaction;
 import io.vanillabp.cockpit.extension.spi.UserTaskEventKind;
 import io.vanillabp.cockpit.extension.spi.WorkflowEventKind;
+import io.vanillabp.integration.adapter.migration.config.MigrationAdapterProperties;
+import io.vanillabp.integration.adapter.migration.scoping.NameClashAvoidanceService;
 import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 
 /**
@@ -62,10 +64,11 @@ public class Camunda7CockpitEventsTest {
     publisher = new RecordingPublisher();
     processes = new Camunda7WorkflowProcesses();
     processes.register(MODULE_ID, BPMN_PROCESS_ID);
-    // no name-clash avoidance, which is what a workflow module deployed under a tenant of its
-    // own looks like: the tenant is the module id and the process id is the plain one
+    // the real name-clash avoidance of an application which configured none, which resolves to
+    // 'by-adapter': the workflow module is a tenant of its own and the process id stays plain
     events = new Camunda7CockpitEvents(
-        new Camunda7Scope(ADAPTER_ID, null, null), processes, () -> publisher, EventTransaction.CURRENT);
+        new Camunda7Scope(
+            ADAPTER_ID, new NameClashAvoidanceService(new MigrationAdapterProperties()), null), processes, () -> publisher, EventTransaction.CURRENT);
 
   }
 
@@ -265,13 +268,12 @@ public class Camunda7CockpitEventsTest {
 
     assertTrue(processes.resolve(events.scope(), MODULE_ID, null).isEmpty());
     assertTrue(processes.resolve(events.scope(), null, BPMN_PROCESS_ID).isEmpty());
-    assertEquals(
-        Set.of(new Camunda7WorkflowProcesses.WorkflowProcess(MODULE_ID, BPMN_PROCESS_ID)),
-        processes.registered());
     // registering the same process again changes nothing, which is what a second adapter
     // deploying the same workflow module does
     processes.register(MODULE_ID, BPMN_PROCESS_ID);
-    assertEquals(1, processes.registered().size());
+    assertEquals(
+        Optional.of(new Camunda7WorkflowProcesses.WorkflowProcess(MODULE_ID, BPMN_PROCESS_ID)),
+        processes.resolve(events.scope(), MODULE_ID, BPMN_PROCESS_ID));
 
   }
 

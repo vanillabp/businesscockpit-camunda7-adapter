@@ -23,8 +23,7 @@ public final class Camunda7Scope {
 
   /**
    * @param adapterId The configured adapter id whose engine this scope belongs to
-   * @param scoping VanillaBP's name-clash avoidance, or <code>null</code> where the platform
-   *          offers none
+   * @param scoping VanillaBP's name-clash avoidance
    * @param configuredTenantId What the adapter was configured with, or <code>null</code>
    */
   public Camunda7Scope(
@@ -69,9 +68,7 @@ public final class Camunda7Scope {
       final String workflowModuleId,
       final String bpmnProcessId) {
 
-    return scoping == null
-        ? bpmnProcessId
-        : scoping.scopedProcessId(workflowModuleId, bpmnProcessId, adapterId);
+    return scoping.scopedProcessId(workflowModuleId, bpmnProcessId, adapterId);
 
   }
 

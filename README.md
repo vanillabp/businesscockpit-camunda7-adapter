@@ -55,7 +55,8 @@ What the core does, class by class:
 - `Camunda7MultiInstances` is the one thing the engine's query API cannot answer: the
   multi-instance context of a user task, walked out of the execution tree.
 - `Camunda7Scope` and `Camunda7EngineSettings` are how the extension asks the adapter what an
-  engine calls things, rather than building a prefix or a tenant of its own.
+  engine calls things and how the platform modules say whether the engine's work runs in the
+  application's transaction, rather than building a prefix, a tenant or an answer of its own.
 
 The decisions these classes rest on are numbered in [`DECISIONS.md`](./DECISIONS.md), and what a
 user of this extension has to know is in the
@@ -63,14 +64,18 @@ user of this extension has to know is in the
 
 ## What is deliberately absent
 
-- **A model rewritten by this extension.** On an embedded engine a listener is attached while the
-  engine parses a model, not written into the file, so the BPMN in your repository and the BPMN the
-  engine gets are the same.
-- **A persistence of its own.** Version 1 kept a table about the workflows it had seen. What the
-  cockpit needs is read from the engine when it is needed, and what has to survive a crash is the
-  outbox entry VanillaBP already provides.
-- **A configuration key of its own.** What this half needs to know about an engine it reads from
-  the Camunda 7 adapter's own section of `vanillabp.adapters.<id>.*`.
+This extension rewrites no model. On an embedded engine a listener is attached while the engine
+parses a model rather than written into the file, so the BPMN in your repository and the BPMN the
+engine gets are the same.
+
+It has no persistence of its own either. Version 1 kept a table about the workflows it had seen;
+what the cockpit needs is read from the engine when it is needed, and what has to survive a crash
+is the outbox entry VanillaBP already provides.
+
+And it has no configuration key of its own. What this half has to know about an engine, the tenant
+a workflow module was deployed under, it reads from the Camunda 7 adapter's own section of
+`vanillabp.adapters.<id>.*`; whether the outbox entry can share the engine's transaction is
+answered by the platform rather than by a key.
 
 ## Building
 

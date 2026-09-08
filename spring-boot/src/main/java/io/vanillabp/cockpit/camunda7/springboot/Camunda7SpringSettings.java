@@ -5,9 +5,11 @@ import io.vanillabp.camunda7.springboot.VanillaBpCamunda7Properties;
 import io.vanillabp.cockpit.camunda7.Camunda7EngineSettings;
 
 /**
- * Reads the two engine settings the extension needs out of the Camunda 7 adapter's own
- * configuration overlay, so that the extension answers what the adapter answers rather than
- * binding <code>vanillabp.adapters.&lt;id&gt;.*</code> a second time and drifting apart from it.
+ * What the extension has to know about a Camunda 7 engine of a Spring Boot application: the
+ * tenant out of the Camunda 7 adapter's own configuration overlay, so that the extension
+ * answers what the adapter answers rather than binding
+ * <code>vanillabp.adapters.&lt;id&gt;.*</code> a second time and drifting apart from it, and
+ * how the engine of this platform is tied into transactions.
  */
 public class Camunda7SpringSettings implements Camunda7EngineSettings {
 
@@ -34,12 +36,18 @@ public class Camunda7SpringSettings implements Camunda7EngineSettings {
 
   }
 
+  /**
+   * On Spring Boot an engine on the application's data source is built with the application's
+   * own transaction manager, so its commands run in the transaction the application is in. An
+   * engine named a data source of its own is built with a transaction manager of its own, and
+   * a command of it then commits without the application noticing.
+   */
   @Override
-  public boolean runsOnItsOwnDataSource(
+  public boolean joinsTheApplicationTransaction(
       final String adapterId) {
 
     final var adapter = adapterOf(adapterId);
-    return (adapter != null) && adapter.usesSeparateDataSource();
+    return (adapter == null) || !adapter.usesSeparateDataSource();
 
   }
 
