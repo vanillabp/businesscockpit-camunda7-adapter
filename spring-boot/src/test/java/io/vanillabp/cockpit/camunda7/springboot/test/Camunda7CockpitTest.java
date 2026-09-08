@@ -55,7 +55,7 @@ public class Camunda7CockpitTest {
   static void cockpitServer(
       final DynamicPropertyRegistry registry) {
 
-    registry.add("vanillabp.extensions.business-cockpit.rest.base-url", CockpitServer::baseUrl);
+    registry.add("vanillabp.cockpit.rest.base-url", CockpitServer::baseUrl);
 
   }
 

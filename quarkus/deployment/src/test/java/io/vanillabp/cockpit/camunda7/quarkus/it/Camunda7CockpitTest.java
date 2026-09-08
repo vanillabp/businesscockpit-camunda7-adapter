@@ -58,7 +58,7 @@ public class Camunda7CockpitTest {
               // about what arrived has to be reachable from there as well
               .addClass(CockpitServer.class))
       .overrideRuntimeConfigKey(
-          "vanillabp.extensions.business-cockpit.rest.base-url", CockpitServer.baseUrl());
+          "vanillabp.cockpit.rest.base-url", CockpitServer.baseUrl());
 
   @Inject
   TestWorkflowService workflowService;

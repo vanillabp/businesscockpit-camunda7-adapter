@@ -56,7 +56,7 @@ public class Camunda7OwnDataSourceTest {
               .addClass(TestWorkflowService.class)
               .addClass(CockpitServer.class))
       .overrideRuntimeConfigKey(
-          "vanillabp.extensions.business-cockpit.rest.base-url", CockpitServer.baseUrl());
+          "vanillabp.cockpit.rest.base-url", CockpitServer.baseUrl());
 
   @Inject
   TestWorkflowService workflowService;
