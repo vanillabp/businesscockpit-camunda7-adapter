@@ -71,7 +71,11 @@ engine gets are the same.
 
 It has no persistence of its own either. Version 1 kept a table about the workflows it had seen;
 what the cockpit needs is read from the engine when it is needed, and what has to survive a crash
-is the outbox entry VanillaBP already provides.
+is the outbox entry VanillaBP already provides. Which of an application's outbox stores that entry
+is written into is VanillaBP's answer rather than this half's: an event names a workflow module, a
+BPMN process and a serialized id, and the store the matching aggregate's transaction reaches is the
+one it lands in. An application whose aggregates live in two persistences therefore needs nothing
+extra here.
 
 And it has no configuration key of its own. What this half has to know about an engine, the tenant
 a workflow module was deployed under, it reads from the Camunda 7 adapter's own section of
