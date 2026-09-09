@@ -68,7 +68,8 @@ public final class Camunda7Scope {
       final String workflowModuleId,
       final String bpmnProcessId) {
 
-    return scoping.scopedProcessId(workflowModuleId, bpmnProcessId, adapterId);
+    return NameClashAvoidanceSupport
+        .scopedProcessId(scoping, workflowModuleId, bpmnProcessId, adapterId);
 
   }
 
