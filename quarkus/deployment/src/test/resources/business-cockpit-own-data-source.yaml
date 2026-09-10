@@ -1,0 +1,33 @@
+quarkus:
+  datasource:
+    db-kind: h2
+    jdbc:
+      url: jdbc:h2:mem:c7-cockpit-quarkus-application;DB_CLOSE_DELAY=-1
+      transactions: xa
+    engine:
+      db-kind: h2
+      jdbc:
+        url: jdbc:h2:mem:c7-cockpit-quarkus-engine;DB_CLOSE_DELAY=-1
+        transactions: xa
+vanillabp:
+  outbox:
+    poll-interval: PT0.2S
+    attempt-frequency: PT0.2S
+  adapters:
+    c7:
+      type: camunda7
+      name-clash-avoidance: by-adapter
+      data-source-name: engine
+  prioritized-adapters:
+    - c7
+  workflow-modules:
+    c7-cockpit:
+      adapters:
+        c7:
+          resources-location: classpath:c7-cockpit/processes
+      cockpit:
+        workflow-module-uri: http://localhost:8081/c7-cockpit
+        ui-uri-type: WEBPACK_MF_REACT
+        ui-uri-path: /remoteEntry.js
+        i18n-languages: en
+        bpmn-description-language: en

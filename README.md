@@ -14,52 +14,88 @@ it saw, and hands the result to the cockpit server.
 
 ## Status
 
-There is no implementation here yet. The repository was created ahead of the work so that the
-build and the pipelines are settled before the first line of code is written,
-and what it contains today is that skeleton and nothing else.
-
-The extension itself arrives with the VanillaBP 2 extension work. It builds on the extension SPI
-of `adapter-platform-integration` and on the cockpit's `extensions-commons` module, and neither of
-them is released yet, so no module here could hold a class that compiles. The Version 1 adapter is
-still where it always was, as `adapters/camunda7` of the
+The extension is here and runs on both platforms against a real embedded Camunda 7 engine. It
+builds on the extension SPI of `adapter-platform-integration` and on the cockpit's
+`extensions-commons`, both of which are still snapshots, so this repository is one too. The
+Version 1 adapter is still where it always was, as `adapters/camunda7` of the
 [business-cockpit](https://github.com/vanillabp/business-cockpit) repository, and it stays there
-until the cockpit switches to VanillaBP 2. Nothing of it is moved here: this repository starts from
-the extension, so its history never carries the Version 1 shape.
+until the cockpit switches to VanillaBP 2. Nothing of it was moved here: this repository starts
+from the extension, so its history never carries the Version 1 shape.
 
-## What is here today
+## What is here
 
-The parent POM, which builds green and publishes itself as a snapshot, the three GitHub Actions
-workflows, the formatting rules every VanillaBP repository shares, and the license
-and notice files. The POM already manages the versions of everything the extension will depend on,
-so adding the first module is adding a module rather than assembling a build.
+The extension is split the way every VanillaBP adapter repository is split, and the artifacts keep
+the repository name as their prefix so that a jar of this repository is never mistaken for a jar of
+the VanillaBP Camunda 7 adapter it plugs into.
 
-Deliberately absent, and not as an empty placeholder:
+|         Module         |                       Artifact                        |                                   What is in it                                    |
+|------------------------|-------------------------------------------------------|------------------------------------------------------------------------------------|
+| `core`                 | `businesscockpit-camunda7-adapter`                    | Everything which needs neither Spring nor Quarkus                                  |
+| `spring-boot`          | `businesscockpit-camunda7-adapter-spring-boot`        | One auto-configuration, one bean registrar, the tests against a booted application |
+| `quarkus/runtime`      | `businesscockpit-camunda7-adapter-quarkus`            | One CDI producer doing what the auto-configuration does                            |
+| `quarkus/deployment`   | `businesscockpit-camunda7-adapter-quarkus-deployment` | One build step, and the tests running the extension inside a Quarkus application   |
+| `test-coverage-report` | not published                                         | The per-platform JaCoCo aggregation and the gate judging it                        |
 
-- The `core`, `spring-boot`, `quarkus/runtime` and `quarkus/deployment` modules. Every class each of
-  them would hold needs the cockpit's `extensions-commons` artifact, so an empty module would only
-  publish an empty jar under coordinates somebody might resolve.
-- The `test-coverage-report` module with its coverage gate. It measures modules, and there are
-  none. The gate that the Business Cockpit repository built for `adapters-spring-boot` moves here
-  together with the code it measures.
-- A `DECISIONS.md` with decisions in it. The log exists and explains its own rules, and it stays
-  empty until code points at an entry.
+What the core does, class by class:
 
-## What arrives with the extension
+- `Camunda7CockpitWiring` takes part in VanillaBP's deployment pipeline for a workflow module which
+  runs on Camunda 7, and remembers which BPMN processes were deployed.
+- `Camunda7WorkflowProcesses` is that memory, and the way back from the identifiers an engine
+  reports to the workflow module and the plain process id the application wrote.
+- `Camunda7CockpitCustomizer` is what the Camunda 7 adapter asks per configured adapter id: it
+  contributes the parse listener and the history event handler of that engine, and it ends the boot
+  of an engine whose history level writes none of what the cockpit reads back.
+- `Camunda7UserTaskParseListener` attaches `Camunda7UserTaskListener` to every user task, as a
+  built-in listener of all four task events.
+- `Camunda7WorkflowHistoryHandler` turns the engine's process-instance history events into the
+  cockpit's workflow events.
+- `Camunda7CockpitEvents` is what both of them report through: it builds the identifiers and writes
+  one outbox entry.
+- `Camunda7CockpitBridge` answers everything the cockpit reads back about a task or a workflow,
+  which happens when the entry is dispatched and the engine's transaction is long committed.
+- `Camunda7MultiInstances` is the one thing the engine's query API cannot answer: the
+  multi-instance context of a user task, walked out of the execution tree.
+- `Camunda7Scope` and `Camunda7EngineSettings` are how the extension asks the adapter what an
+  engine calls things and how the platform modules say whether the engine's work runs in the
+  application's transaction, rather than building a prefix, a tenant or an answer of its own.
 
-The module layout is the one every VanillaBP adapter repository uses: `core` for everything that
-needs neither Spring nor Quarkus, `spring-boot` and `quarkus/runtime` plus `quarkus/deployment` for
-the glue that registers the extension with each platform, and `test-coverage-report` for the
-per-platform coverage measurement. The artifacts keep the repository name as their prefix, so
-`businesscockpit-camunda7-adapter` is the core and `businesscockpit-camunda7-adapter-spring-boot`
-is what a Spring Boot application depends on. The prefix is what keeps a jar of this repository
-apart from the jar of the VanillaBP Camunda 7 adapter it plugs into, which is a distinction
-Version 1 did not make.
+The decisions these classes rest on are numbered in [`DECISIONS.md`](./DECISIONS.md), and what a
+user of this extension has to know is in the
+[wiki](https://github.com/vanillabp/businesscockpit-camunda7-adapter/wiki).
+
+## What is deliberately absent
+
+This extension rewrites no model. On an embedded engine a listener is attached while the engine
+parses a model rather than written into the file, so the BPMN in your repository and the BPMN the
+engine gets are the same.
+
+It has no persistence of its own either. Version 1 kept a table about the workflows it had seen;
+what the cockpit needs is read from the engine when it is needed, and what has to survive a crash
+is the outbox entry VanillaBP already provides. Which of an application's outbox stores that entry
+is written into is VanillaBP's answer rather than this half's: an event names a workflow module, a
+BPMN process and a serialized id, and the store the matching aggregate's transaction reaches is the
+one it lands in. An application whose aggregates live in two persistences therefore needs nothing
+extra here.
+
+And it has no configuration key of its own. What this half has to know about an engine, the tenant
+a workflow module was deployed under, it reads from the Camunda 7 adapter's own section of
+`vanillabp.adapters.<id>.*`; whether the outbox entry can share the engine's transaction is
+answered by the platform rather than by a key.
 
 ## Building
 
 ```bash
 mvn install
 ```
+
+`install` and not `install verify`: `install` runs every phase `verify` has, and naming both walks
+two lifecycles per module. It has to be `install` rather than `package`, because the Quarkus tests
+load the modules of this repository from the local Maven repository.
+
+The tests boot real applications on both platforms: a Spring Boot context and a Quarkus application,
+each with an embedded Camunda 7 engine on H2, a cockpit server the test runs itself and the outbox
+in between. No BPMS double and no mock of the engine, because what is under test is exactly the
+part which touches the engine.
 
 Snapshots are published to GitHub Packages by the pipeline described below, and releases go to
 Maven Central under the groupId `io.vanillabp.businesscockpit`, like the rest of the Business

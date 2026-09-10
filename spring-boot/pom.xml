@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.vanillabp.businesscockpit</groupId>
+    <artifactId>businesscockpit-camunda7-adapter-parent</artifactId>
+    <version>0.9.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>businesscockpit-camunda7-adapter-spring-boot</artifactId>
+  <name>VanillaBP Business Cockpit adapter for Camunda 7 - Spring Boot</name>
+  <description>Registers the Camunda 7 half of the Business Cockpit extension on Spring Boot: the engine customizer installing the listeners, the wiring service, and one bridge bean per configured Camunda 7 adapter id.</description>
+
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <id>VanillaBP</id>
+      <organization>Phactum Softwareentwicklung GmbH</organization>
+      <organizationUrl>https://www.phactum.at</organizationUrl>
+    </developer>
+  </developers>
+
+  <dependencies>
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>businesscockpit-camunda7-adapter</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.vanillabp.businesscockpit</groupId>
+      <artifactId>extensions-commons-spring-boot</artifactId>
+    </dependency>
+    <dependency>
+      <!-- the engines this extension listens to: they are held per configured adapter id by
+        the adapter's Spring Boot module, which is the only place the extension takes them from -->
+      <groupId>org.camunda.community.vanillabp</groupId>
+      <artifactId>camunda7-adapter-spring-boot</artifactId>
+    </dependency>
+    <dependency>
+      <!-- VanillaBP's resolved configuration, which is where this module reads the configured
+        adapter ids from; it arrives transitively as well, and is declared because the
+        auto-configuration and the bean registrar compile against it -->
+      <groupId>io.vanillabp.adapter</groupId>
+      <artifactId>migration-adapter</artifactId>
+    </dependency>
+    <dependency>
+      <!-- the platform's own registrar support, which answers which adapter ids of a type this
+        application configured; it arrives transitively as well, and is declared because the bean
+        registrar compiles against it -->
+      <groupId>io.vanillabp</groupId>
+      <artifactId>vanillabp-spring-boot-integration</artifactId>
+    </dependency>
+    <dependency>
+      <!-- the adapter SPI, for the name-clash avoidance this module hands the customizer: it
+        arrives transitively as well, and is declared because the auto-configuration compiles against it -->
+      <groupId>io.vanillabp</groupId>
+      <artifactId>vanillabp-adapter-spi</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.vanillabp</groupId>
+      <artifactId>test-utils</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

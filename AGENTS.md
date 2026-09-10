@@ -3,8 +3,8 @@
 The VanillaBP Business Cockpit integration for Camunda 7, built as an extension of VanillaBP
 Version 2, on Spring Boot and on Quarkus.
 
-Read [`README.md`](./README.md) first: it says what is here today, what arrives with the extension
-work and why, and how to build.
+Read [`README.md`](./README.md) first: it says which module holds what, what is deliberately absent
+and why, and how to build.
 
 ## This is an extension, not a BPMS adapter
 

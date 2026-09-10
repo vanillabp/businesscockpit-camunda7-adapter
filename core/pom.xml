@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.vanillabp.businesscockpit</groupId>
+    <artifactId>businesscockpit-camunda7-adapter-parent</artifactId>
+    <version>0.9.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>businesscockpit-camunda7-adapter</artifactId>
+  <name>VanillaBP Business Cockpit adapter for Camunda 7 - Core</name>
+  <description>Everything the Business Cockpit extension does with an embedded Camunda 7 engine and without knowing a platform: the engine customizer adding the task listeners and the history handler, and the bridge answering what the cockpit reads about a task or a workflow.</description>
+
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <id>VanillaBP</id>
+      <organization>Phactum Softwareentwicklung GmbH</organization>
+      <organizationUrl>https://www.phactum.at</organizationUrl>
+    </developer>
+  </developers>
+
+  <!-- No platform integration is a dependency here, deliberately: this module compiles
+       against the extension SPI, the platform-neutral half of the cockpit extension and the
+       CORE artifact of the VanillaBP Camunda 7 adapter, and against nothing which exists only
+       on Spring Boot or only on Quarkus. -->
+
+  <dependencies>
+    <dependency>
+      <groupId>io.vanillabp.businesscockpit</groupId>
+      <artifactId>extensions-commons</artifactId>
+    </dependency>
+    <dependency>
+      <!-- names the processing context this extension is wired with, and holds the engine
+           customizer its listeners are installed through. It brings the Camunda engine and
+           the VanillaBP SPI artifacts along. -->
+      <groupId>org.camunda.community.vanillabp</groupId>
+      <artifactId>camunda7-adapter</artifactId>
+    </dependency>
+    <dependency>
+      <!-- arrives transitively as well; declared because this module implements it -->
+      <groupId>io.vanillabp</groupId>
+      <artifactId>vanillabp-extension-spi</artifactId>
+    </dependency>
+    <dependency>
+      <!-- the adapter SPI, for the name-clash avoidance an adapter is handed: this module asks
+        it what an engine calls a process rather than building the name itself -->
+      <groupId>io.vanillabp</groupId>
+      <artifactId>vanillabp-adapter-spi</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.camunda.bpm</groupId>
+      <artifactId>camunda-engine</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <!-- brings the output suppression every VanillaBP test class registers, and with it the
+        Mockito the engine's own types are stood in with -->
+      <groupId>io.vanillabp</groupId>
+      <artifactId>test-utils</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <!-- the core's own name-clash avoidance, so a test asks the real one what an engine calls
+        a process instead of teaching a double to answer -->
+      <groupId>io.vanillabp.adapter</groupId>
+      <artifactId>migration-adapter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <!-- the database a test builds a real engine on: what this module contributes to an
+        engine is only true of an engine which was built, and a mocked configuration answers
+        whatever it was taught -->
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>
