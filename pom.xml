@@ -57,7 +57,7 @@
     <camunda.version>7.24.0</camunda.version>
     <!-- the Business Cockpit itself: extensions-commons is the platform-neutral half of
          this extension and is consumed as a published artifact, never copied -->
-    <business-cockpit.version>0.4.1-SNAPSHOT</business-cockpit.version>
+    <business-cockpit.version>0.9.0-SNAPSHOT</business-cockpit.version>
     <spring-boot.version>4.1.1</spring-boot.version>
     <quarkus.version>3.39.2</quarkus.version>
     <!-- where the build stops, the same number in every VanillaBP repository -->
