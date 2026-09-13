@@ -129,6 +129,46 @@ public final class CockpitServer {
   }
 
   /**
+   * Waits for a request of one kind which is about the thing the caller means.
+   * <p>
+   * Every test of a class shares this server, and a report of an earlier test may arrive after
+   * that test forgot what it had seen - the dispatch of an entry outlives the test which caused
+   * it. So a test which asserts content waits for the request carrying it rather than for the
+   * next one of its kind.
+   *
+   * @param pathSuffix What the path has to end with
+   * @param bodyPart What the body has to carry
+   * @return The request
+   */
+  public static Request awaitRequest(
+      final String pathSuffix,
+      final String bodyPart) {
+
+    final var deadline = System.currentTimeMillis() + 30000;
+    while (System.currentTimeMillis() < deadline) {
+      final var match = matching(pathSuffix)
+          .stream()
+          .filter(request -> request.body().contains(bodyPart))
+          .findFirst();
+      if (match.isPresent()) {
+        return match.get();
+      }
+      sleep();
+    }
+    // what arrived on that path is named in full: a caller who only sees the paths cannot tell
+    // whether the report it wanted never came or came with another content, and that is the
+    // question every failure here raises
+    throw new AssertionError(
+        "No request ending in '%s' carried '%s'. What arrived on that path: %s. All paths received: %s"
+            .formatted(
+                pathSuffix,
+                bodyPart,
+                matching(pathSuffix),
+                received().stream().map(Request::path).toList()));
+
+  }
+
+  /**
    * Waits until the given number of requests of one kind arrived.
    *
    * @param pathSuffix What the paths have to end with
