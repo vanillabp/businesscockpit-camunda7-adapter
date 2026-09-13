@@ -96,6 +96,11 @@ public class TestWorkflowService {
   /**
    * Matched by the form key of the user task. It enriches what the engine reported and writes
    * into the workflow aggregate, which is what a details provider is for.
+   * <p>
+   * The write has to stay even though no test reads the note any more. It is what leaves the case
+   * dirty in the transaction which dispatches the report. A dispatch writing nothing is no second
+   * writer of the case, and a second writer is what the version attribute of TestAggregate
+   * answers.
    *
    * @param aggregate The workflow aggregate, loaded by VanillaBP
    * @param prefilled What the engine knew about the task
