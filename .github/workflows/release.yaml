@@ -1,7 +1,11 @@
 name: Release
 # Publishes to Maven Central through the release parent's 'release' and 'central-portal'
-# profiles, the same way the Business Cockpit itself is released. Everything happens on a
-# release branch, so main is never carrying a released version.
+# profiles. Everything happens on a release branch, so main is never carrying a released
+# version.
+#
+# No snapshot comes out of a release here. The Business Cockpit's release deploys the next
+# snapshot to GitHub Packages before it is done; this one only writes the next version into
+# the pull request back into main, and the publish of main deploys the snapshot from there.
 "on":
   workflow_dispatch:
     inputs:
