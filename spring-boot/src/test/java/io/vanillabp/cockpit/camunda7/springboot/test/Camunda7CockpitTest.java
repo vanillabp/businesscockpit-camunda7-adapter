@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import org.camunda.bpm.engine.ProcessEngine;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -51,6 +53,13 @@ public class Camunda7CockpitTest {
 
   private static final String MODULE_ID = "c7-cockpit";
 
+  /**
+   * How often the application repeats a transaction which read a conflict. Two would do for the
+   * one other writer there is; the third is there so that a repetition which itself meets the
+   * next report does not end the test.
+   */
+  private static final int ATTEMPTS_OF_THE_APPLICATION = 3;
+
   @DynamicPropertySource
   static void cockpitServer(
       final DynamicPropertyRegistry registry) {
@@ -78,6 +87,78 @@ public class Camunda7CockpitTest {
   public void forgetWhatArrivedBefore() {
 
     CockpitServer.forgetRequests();
+
+  }
+
+  /**
+   * Changes one case and reports the change, the way an application whose workflow aggregate
+   * carries a version attribute has to do it: in a transaction which is repeated where somebody
+   * else wrote the same case in between.
+   * <p>
+   * That somebody is the Business Cockpit itself. Its details provider reads the case while a
+   * report is dispatched and writes it back when that dispatch commits, so the two transactions
+   * overlap whenever an application changes a case it has just reported. Without the version
+   * attribute the later of the two writers wins silently; with it, one of them reads a conflict
+   * and repeats.
+   *
+   * @param aggregateId The case to change
+   * @param changeAndReport Changes the attached case and reports it to the cockpit
+   */
+  private void changeTheCase(
+      final Long aggregateId,
+      final Consumer<TestAggregate> changeAndReport) {
+
+    for (var attempt = 1;; attempt++) {
+      try {
+        transactions
+            .executeWithoutResult(status -> {
+              final var attached = aggregates.findById(aggregateId).orElseThrow();
+              changeAndReport.accept(attached);
+              aggregates.save(attached);
+            });
+        return;
+      } catch (final OptimisticLockingFailureException e) {
+        if (attempt >= ATTEMPTS_OF_THE_APPLICATION) {
+          throw new AssertionError(
+              "The application gave up after %d attempts at changing case %s"
+                  .formatted(attempt, aggregateId), e);
+        }
+      }
+    }
+
+  }
+
+  /**
+   * Waits for a report of one kind which carries the value the application wrote.
+   * <p>
+   * A report carrying the older value has two possible causes and they need different work: the
+   * report read the case too early, or the case itself lost the change. So a failure names what
+   * the case carries now as well - see the version attribute of {@link TestAggregate}.
+   *
+   * @param pathSuffix What the report's path has to end with
+   * @param expected What its body has to carry
+   * @param aggregate The case the report is about
+   * @return The report
+   */
+  private CockpitServer.Request awaitReportCarrying(
+      final String pathSuffix,
+      final String expected,
+      final TestAggregate aggregate) {
+
+    try {
+      return CockpitServer.awaitRequest(pathSuffix, expected);
+    } catch (final AssertionError e) {
+      throw new AssertionError(
+          "%s And the stored case now carries the customer '%s'."
+              .formatted(
+                  e.getMessage(),
+                  transactions
+                      .execute(
+                          status -> aggregates
+                              .findById(aggregate.getId())
+                              .orElseThrow()
+                              .getCustomer())), e);
+    }
 
   }
 
@@ -230,16 +311,19 @@ public class Camunda7CockpitTest {
     final var workflowId = workflowIdOf(aggregate);
     CockpitServer.forgetRequests();
 
-    transactions
-        .executeWithoutResult(status -> {
-          final var attached = aggregates.findById(aggregate.getId()).orElseThrow();
+    changeTheCase(
+        aggregate.getId(),
+        attached -> {
           attached.setCustomer("Emil the second");
-          aggregates.save(attached);
           workflowService.businessCockpit().aggregateChanged(attached);
         });
 
-    final var updated = CockpitServer.awaitRequest("/workflow/%s/updated".formatted(workflowId));
-    assertTrue(updated.body().contains("Emil the second"), updated.body());
+    // the report carries what the application wrote, not what the case said before it. The
+    // report of the user task may still be dispatching while this runs, and its details provider
+    // holds the case over this transaction - the version attribute of TestAggregate is what
+    // keeps that dispatch from writing the older reading back
+    awaitReportCarrying(
+        "/workflow/%s/updated".formatted(workflowId), "Emil the second", aggregate);
 
   }
 
@@ -252,16 +336,15 @@ public class Camunda7CockpitTest {
     CockpitServer.awaitRequest("/usertask/created");
     CockpitServer.forgetRequests();
 
-    transactions
-        .executeWithoutResult(status -> {
-          final var attached = aggregates.findById(aggregate.getId()).orElseThrow();
+    changeTheCase(
+        aggregate.getId(),
+        attached -> {
           attached.setCustomer("Frida the second");
-          aggregates.save(attached);
           workflowService.businessCockpit().aggregateChanged(attached, userTaskId);
         });
 
-    final var updated = CockpitServer.awaitRequest("/usertask/%s/updated".formatted(userTaskId));
-    assertTrue(updated.body().contains("Frida the second"), updated.body());
+    awaitReportCarrying(
+        "/usertask/%s/updated".formatted(userTaskId), "Frida the second", aggregate);
 
   }
 
