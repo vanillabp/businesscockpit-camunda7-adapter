@@ -20,6 +20,7 @@ import org.camunda.bpm.engine.task.IdentityLinkType;
 import org.camunda.bpm.engine.task.Task;
 
 import io.vanillabp.camunda7.Camunda7Adapter;
+import io.vanillabp.camunda7.api.Camunda7EngineFacts;
 import io.vanillabp.camunda7.api.Camunda7Executions;
 import io.vanillabp.camunda7.api.Camunda7MultiInstances;
 import io.vanillabp.camunda7.api.Camunda7TaskDefinitions;
@@ -54,21 +55,26 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
 
   private final Camunda7Scope scope;
 
+  private final Camunda7EngineFacts engineFacts;
+
   private final Camunda7WorkflowProcesses processes;
 
   private final ProcessEngine engine;
 
   /**
    * @param scope The engine this bridge serves
+   * @param engineFacts What the Camunda 7 adapter knows about that engine
    * @param processes The deployed processes, to translate the engine's identifiers back
    * @param engine The engine
    */
   public Camunda7CockpitBridge(
       final Camunda7Scope scope,
+      final Camunda7EngineFacts engineFacts,
       final Camunda7WorkflowProcesses processes,
       final ProcessEngine engine) {
 
     this.scope = scope;
+    this.engineFacts = engineFacts;
     this.processes = processes;
     this.engine = engine;
 
@@ -126,7 +132,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
       return Optional
           .of(
               new WorkflowDetailsPrefill(
-                  versionOf(definition), instance.getBusinessKey(), processNameOf(
+                  versionOf(instance.getProcessDefinitionId()), instance.getBusinessKey(), processNameOf(
                       definition, workflow.bpmnProcessId()), instance.getStartUserId()));
     });
 
@@ -263,7 +269,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
 
     return UserTaskDetailsPrefill
         .builder()
-        .bpmnProcessVersion(versionOf(definition))
+        .bpmnProcessVersion(versionOf(task.getProcessDefinitionId()))
         .bpmnProcessName(processNameOf(definition, bpmnProcessId))
         .bpmnTaskName(task.getName())
         .workflowId(Camunda7Executions.rootProcessInstanceIdOf(workflow))
@@ -300,7 +306,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
 
     return UserTaskDetailsPrefill
         .builder()
-        .bpmnProcessVersion(versionOf(definition))
+        .bpmnProcessVersion(versionOf(task.getProcessDefinitionId()))
         .bpmnProcessName(processNameOf(definition, bpmnProcessId))
         .bpmnTaskName(task.getName())
         .workflowId(Camunda7Executions.rootProcessInstanceIdOf(workflow))
@@ -452,19 +458,28 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
   }
 
   /**
-   * How Camunda counts a deployed process, spelled the way version 1 spelled it so that a
-   * cockpit server which has both is looking at one kind of string.
+   * How Camunda counts the deployed process a workflow runs on, as an operator reads it.
+   * <p>
+   * The adapter resolved that definition when it first met it and answers every later question
+   * about it from its own cache, so a cockpit asking once per task and once per rendered page
+   * pays the engine for none of them. Turning the version and its tag into one string is the
+   * platform's rule rather than this repository's, which is what makes one deployment read the
+   * same however the cockpit heard about it.
+   * <p>
+   * Nothing is reported while the adapter has no deployment service for this adapter id yet,
+   * and nothing for a definition the engine no longer holds. Every field of a prefill is
+   * optional, so a version nobody can name is left out rather than guessed at.
+   *
+   * @param processDefinitionId The engine's process definition id
+   * @return The version as an operator reads it, or <code>null</code>
    */
-  private static String versionOf(
-      final ProcessDefinition definition) {
+  private String versionOf(
+      final String processDefinitionId) {
 
-    if (definition == null) {
-      return null;
-    }
-    final var versionTag = definition.getVersionTag();
-    return (versionTag == null) || versionTag.isBlank()
-        ? String.valueOf(definition.getVersion())
-        : "%s:%d".formatted(versionTag, definition.getVersion());
+    final var deployed = engineFacts.definitionOf(processDefinitionId);
+    return deployed == null
+        ? null
+        : deployed.displayVersion();
 
   }
 
