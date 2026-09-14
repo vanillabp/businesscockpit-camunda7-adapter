@@ -3,6 +3,7 @@ package io.vanillabp.cockpit.camunda7;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -19,11 +20,16 @@ import org.camunda.bpm.engine.task.IdentityLinkType;
 import org.camunda.bpm.engine.task.Task;
 
 import io.vanillabp.camunda7.Camunda7Adapter;
+import io.vanillabp.camunda7.api.Camunda7EngineFacts;
+import io.vanillabp.camunda7.api.Camunda7Executions;
+import io.vanillabp.camunda7.api.Camunda7MultiInstances;
+import io.vanillabp.camunda7.api.Camunda7TaskDefinitions;
 import io.vanillabp.cockpit.extension.spi.BusinessCockpitBpmsBridge;
 import io.vanillabp.cockpit.extension.spi.UserTaskDetailsPrefill;
 import io.vanillabp.cockpit.extension.spi.UserTaskReference;
 import io.vanillabp.cockpit.extension.spi.WorkflowDetailsPrefill;
 import io.vanillabp.cockpit.extension.spi.WorkflowReference;
+import io.vanillabp.integration.extension.spi.handler.HandlerMultiInstance;
 
 /**
  * What one configured Camunda 7 engine can be asked about a task or a workflow.
@@ -49,21 +55,26 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
 
   private final Camunda7Scope scope;
 
+  private final Camunda7EngineFacts engineFacts;
+
   private final Camunda7WorkflowProcesses processes;
 
   private final ProcessEngine engine;
 
   /**
    * @param scope The engine this bridge serves
+   * @param engineFacts What the Camunda 7 adapter knows about that engine
    * @param processes The deployed processes, to translate the engine's identifiers back
    * @param engine The engine
    */
   public Camunda7CockpitBridge(
       final Camunda7Scope scope,
+      final Camunda7EngineFacts engineFacts,
       final Camunda7WorkflowProcesses processes,
       final ProcessEngine engine) {
 
     this.scope = scope;
+    this.engineFacts = engineFacts;
     this.processes = processes;
     this.engine = engine;
 
@@ -92,7 +103,6 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
           .getTaskService()
           .createTaskQuery()
           .taskId(userTask.userTaskId())
-          .initializeFormKeys()
           .singleResult();
       if (task != null) {
         return Optional.of(prefillOf(task, userTask.bpmnProcessId()));
@@ -122,7 +132,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
       return Optional
           .of(
               new WorkflowDetailsPrefill(
-                  versionOf(definition), instance.getBusinessKey(), processNameOf(
+                  versionOf(instance.getProcessDefinitionId()), instance.getBusinessKey(), processNameOf(
                       definition, workflow.bpmnProcessId()), instance.getStartUserId()));
     });
 
@@ -168,8 +178,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
     var query = engine
         .getTaskService()
         .createTaskQuery()
-        .processInstanceBusinessKey(workflowAggregateId)
-        .initializeFormKeys();
+        .processInstanceBusinessKey(workflowAggregateId);
     final var tenantId = scope.tenantIdOf(workflowModuleId);
     query = tenantId != null
         ? query.tenantIdIn(tenantId)
@@ -202,8 +211,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         .getTaskService()
         .createTaskQuery()
         .taskId(userTaskId)
-        .processInstanceBusinessKey(workflowAggregateId)
-        .initializeFormKeys();
+        .processInstanceBusinessKey(workflowAggregateId);
     final var tenantId = scope.tenantIdOf(workflowModuleId);
     query = tenantId != null
         ? query.tenantIdIn(tenantId)
@@ -243,9 +251,11 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         .map(
             process -> new UserTaskReference(
                 scope.adapterId(), process.workflowModuleId(), process
-                    .bpmnProcessId(), workflowAggregateId, rootWorkflowIdOf(
-                        task.getProcessInstanceId()), task.getId(), taskDefinitionOf(
-                            task.getFormKey(), task.getTaskDefinitionKey()), task.getTaskDefinitionKey()));
+                    .bpmnProcessId(), workflowAggregateId, Camunda7Executions
+                        .rootProcessInstanceIdOf(
+                            engine.getHistoryService(), task
+                                .getProcessInstanceId()), task
+                                    .getId(), taskDefinitionOf(task), task.getTaskDefinitionKey()));
 
   }
 
@@ -259,10 +269,10 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
 
     return UserTaskDetailsPrefill
         .builder()
-        .bpmnProcessVersion(versionOf(definition))
+        .bpmnProcessVersion(versionOf(task.getProcessDefinitionId()))
         .bpmnProcessName(processNameOf(definition, bpmnProcessId))
         .bpmnTaskName(task.getName())
-        .workflowId(workflow == null ? null : rootIdOf(workflow))
+        .workflowId(Camunda7Executions.rootProcessInstanceIdOf(workflow))
         .subWorkflowId(subWorkflowIdOf(workflow))
         .businessId(workflow == null ? null : workflow.getBusinessKey())
         .initiator(workflow == null ? null : workflow.getStartUserId())
@@ -272,7 +282,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         .dueDate(atOffset(task.getDueDate()))
         .followUpDate(atOffset(task.getFollowUpDate()))
         .variables(variablesOf(task.getId()))
-        .multiInstances(Camunda7MultiInstances.of(engine, task.getExecutionId()))
+        .multiInstances(multiInstancesOf(task.getExecutionId()))
         .build();
 
   }
@@ -281,6 +291,10 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
    * A task the engine has finished with. History records what the task looked like and, where
    * the engine keeps an identity-link log, who its candidates were; the variables it saw are
    * not read, and a details provider of such a task therefore sees none.
+   * <p>
+   * The business case the task belongs to is read off the process instance rather than off the
+   * task, although the task records it too: the instance is in hand here anyway, and taking it
+   * from one place means one rule about what a root is.
    */
   private UserTaskDetailsPrefill prefillOf(
       final HistoricTaskInstance task,
@@ -292,10 +306,10 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
 
     return UserTaskDetailsPrefill
         .builder()
-        .bpmnProcessVersion(versionOf(definition))
+        .bpmnProcessVersion(versionOf(task.getProcessDefinitionId()))
         .bpmnProcessName(processNameOf(definition, bpmnProcessId))
         .bpmnTaskName(task.getName())
-        .workflowId(task.getRootProcessInstanceId())
+        .workflowId(Camunda7Executions.rootProcessInstanceIdOf(workflow))
         .subWorkflowId(subWorkflowIdOf(workflow))
         .businessId(workflow == null ? null : workflow.getBusinessKey())
         .initiator(workflow == null ? null : workflow.getStartUserId())
@@ -421,29 +435,6 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
 
   }
 
-  private String rootWorkflowIdOf(
-      final String processInstanceId) {
-
-    final var workflow = historicWorkflow(processInstanceId);
-    return workflow == null
-        ? processInstanceId
-        : rootIdOf(workflow);
-
-  }
-
-  /**
-   * The instance a business case is. Camunda records it, and it falls back to the instance
-   * itself for a workflow started before the engine kept that column.
-   */
-  private static String rootIdOf(
-      final HistoricProcessInstance workflow) {
-
-    return workflow.getRootProcessInstanceId() == null
-        ? workflow.getId()
-        : workflow.getRootProcessInstanceId();
-
-  }
-
   /** Named only where the task really sits in a called process. */
   private static String subWorkflowIdOf(
       final HistoricProcessInstance workflow) {
@@ -451,7 +442,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
     if (workflow == null) {
       return null;
     }
-    return workflow.getId().equals(rootIdOf(workflow))
+    return workflow.getId().equals(Camunda7Executions.rootProcessInstanceIdOf(workflow))
         ? null
         : workflow.getId();
 
@@ -467,19 +458,28 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
   }
 
   /**
-   * How Camunda counts a deployed process, spelled the way version 1 spelled it so that a
-   * cockpit server which has both is looking at one kind of string.
+   * How Camunda counts the deployed process a workflow runs on, as an operator reads it.
+   * <p>
+   * The adapter resolved that definition when it first met it and answers every later question
+   * about it from its own cache, so a cockpit asking once per task and once per rendered page
+   * pays the engine for none of them. Turning the version and its tag into one string is the
+   * platform's rule rather than this repository's, which is what makes one deployment read the
+   * same however the cockpit heard about it.
+   * <p>
+   * Nothing is reported while the adapter has no deployment service for this adapter id yet,
+   * and nothing for a definition the engine no longer holds. Every field of a prefill is
+   * optional, so a version nobody can name is left out rather than guessed at.
+   *
+   * @param processDefinitionId The engine's process definition id
+   * @return The version as an operator reads it, or <code>null</code>
    */
-  private static String versionOf(
-      final ProcessDefinition definition) {
+  private String versionOf(
+      final String processDefinitionId) {
 
-    if (definition == null) {
-      return null;
-    }
-    final var versionTag = definition.getVersionTag();
-    return (versionTag == null) || versionTag.isBlank()
-        ? String.valueOf(definition.getVersion())
-        : "%s:%d".formatted(versionTag, definition.getVersion());
+    final var deployed = engineFacts.definitionOf(processDefinitionId);
+    return deployed == null
+        ? null
+        : deployed.displayVersion();
 
   }
 
@@ -501,13 +501,63 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
 
   }
 
-  private static String taskDefinitionOf(
-      final String formKey,
-      final String bpmnTaskId) {
+  /**
+   * What the cockpit calls a running task: the form key the modeller wrote, and the element id
+   * where the model carries none.
+   * <p>
+   * The form key is read off the deployed process definition rather than off the task. A task
+   * answers the form key its engine COMPUTED, and a form key which is an expression computes
+   * another string per workflow instance - one task would then reach the cockpit under as many
+   * identities as it has instances, and none of them would be the identity its listener
+   * reported while the model was parsed. Reading the definition is also why no query here asks
+   * the engine to evaluate form keys any more.
+   *
+   * @param task The task the engine answered with
+   * @return What a details provider is matched by and what the cockpit shows a form for
+   */
+  private String taskDefinitionOf(
+      final Task task) {
 
-    return (formKey == null) || formKey.isBlank()
-        ? bpmnTaskId
-        : formKey;
+    return Camunda7TaskDefinitions
+        .of(
+            Camunda7TaskDefinitions
+                .formKeyOf(engine, task.getProcessDefinitionId(), task.getTaskDefinitionKey()),
+            task.getTaskDefinitionKey());
+
+  }
+
+  /**
+   * The multi-instance scopes a user task runs in, as a details provider's
+   * <code>&#64;MultiInstanceElement</code>, <code>&#64;MultiInstanceIndex</code> and
+   * <code>&#64;MultiInstanceTotal</code> parameters are bound from.
+   * <p>
+   * The walk itself belongs to the Camunda 7 adapter: it reads the execution tree, which is
+   * the engine knowledge a Camunda upgrade is most likely to invalidate, and the adapter does
+   * it for its own task deliveries anyway.
+   * <p>
+   * What is left here is a copy from one record into another. The adapter answers what a BPMS
+   * reports about a task, the platform's handler layer takes what an invocation of application
+   * code runs in, and the two are separate contracts although they carry the same three
+   * values. Copying them is done in this one place, and the order the adapter promises -
+   * outermost first - is what the map keeps.
+   *
+   * @param executionId The execution the user task runs in
+   * @return The scopes, keyed by BPMN element id
+   */
+  private Map<String, HandlerMultiInstance> multiInstancesOf(
+      final String executionId) {
+
+    final var outermostFirst = new LinkedHashMap<String, HandlerMultiInstance>();
+    Camunda7MultiInstances
+        .of(engine, executionId)
+        .forEach(
+            (
+                elementId,
+                scope) -> outermostFirst
+                    .put(
+                        elementId,
+                        new HandlerMultiInstance(scope.element(), scope.index(), scope.total())));
+    return outermostFirst;
 
   }
 

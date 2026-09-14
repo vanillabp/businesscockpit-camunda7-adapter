@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -14,6 +16,7 @@ import org.camunda.bpm.engine.ProcessEngine;
 import org.camunda.bpm.engine.delegate.TaskListener;
 import org.camunda.bpm.engine.impl.bpmn.behavior.UserTaskActivityBehavior;
 import org.camunda.bpm.engine.impl.persistence.entity.ProcessDefinitionEntity;
+import org.camunda.bpm.engine.task.Task;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,6 +34,7 @@ import io.vanillabp.cockpit.camunda7.Camunda7UserTaskListener;
 import io.vanillabp.cockpit.extension.spi.BusinessCockpitBpmsBridge;
 import io.vanillabp.cockpit.extension.spi.UserTaskReference;
 import io.vanillabp.cockpit.extension.spi.WorkflowReference;
+import io.vanillabp.cockpit.extension.test.support.CockpitServer;
 import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 
 /**
@@ -489,6 +493,132 @@ public class Camunda7CockpitTest {
 
   }
 
+  /**
+   * A case whose workflow the engine started, rather than VanillaBP. These BPMN processes are
+   * secondary processes of the aggregate, and what is under test is what their user task is
+   * called, not how a workflow is started.
+   *
+   * @param bpmnProcessId The process to start
+   * @param customer What the case is called
+   * @param variables What the instance carries
+   * @return The saved case, whose id is the business key of the started workflow
+   */
+  private TestAggregate aWorkflowStartedByTheEngine(
+      final String bpmnProcessId,
+      final String customer,
+      final Map<String, Object> variables) {
+
+    final var aggregate = transactions
+        .execute(status -> {
+          final var fresh = new TestAggregate();
+          fresh.setCustomer(customer);
+          return aggregates.save(fresh);
+        });
+    var start = engine
+        .getRuntimeService()
+        .createProcessInstanceByKey(bpmnProcessId)
+        .processDefinitionTenantId(MODULE_ID)
+        .businessKey(String.valueOf(aggregate.getId()));
+    for (final var variable : variables.entrySet()) {
+      start = start.setVariable(variable.getKey(), variable.getValue());
+    }
+    start.execute();
+    return aggregate;
+
+  }
+
+  /**
+   * What the bridge calls the one user task of a case.
+   *
+   * @param bpmnProcessId The BPMN process the case runs on
+   * @param aggregate The case
+   * @return The task definition the cockpit would address that task by
+   */
+  private String taskDefinitionReadBackFor(
+      final String bpmnProcessId,
+      final TestAggregate aggregate) {
+
+    final var userTasks = bridge()
+        .userTasksOfAggregate(
+            MODULE_ID, bpmnProcessId, String.valueOf(aggregate.getId()), List.of());
+    assertEquals(1, userTasks.size(), userTasks.toString());
+    return userTasks.getFirst().taskDefinition();
+
+  }
+
+  @Test
+  @DisplayName("A user task the modeller gave no form is called by its element id")
+  public void aTaskWithoutAFormKeyIsCalledByItsElementId() {
+
+    final var aggregate = aWorkflowStartedByTheEngine(
+        TestWorkflowService.NO_FORM_KEY_PROCESS_ID, "Xaver", Map.of());
+
+    final var reported = CockpitServer
+        .awaitRequest(
+            "/usertask/created",
+            "\"bpmnTaskId\":\"%s\"".formatted(TestWorkflowService.NO_FORM_KEY_TASK_ID));
+    assertTrue(
+        reported
+            .body()
+            .contains(
+                "\"taskDefinition\":\"%s\"".formatted(TestWorkflowService.NO_FORM_KEY_TASK_ID)),
+        reported.body());
+
+    assertEquals(
+        TestWorkflowService.NO_FORM_KEY_TASK_ID,
+        taskDefinitionReadBackFor(TestWorkflowService.NO_FORM_KEY_PROCESS_ID, aggregate),
+        "the task the cockpit reads back is called something else than the task it was told about");
+
+  }
+
+  @Test
+  @DisplayName("A form key which is an expression names one task, not one per workflow instance")
+  public void anExpressionFormKeyNamesOneTask() {
+
+    final var firstCase = aWorkflowStartedByTheEngine(
+        TestWorkflowService.EXPRESSION_FORM_KEY_PROCESS_ID, "Yvonne",
+        Map.of(TestWorkflowService.FORM_NAME_VARIABLE, "the-express-form"));
+    final var secondCase = aWorkflowStartedByTheEngine(
+        TestWorkflowService.EXPRESSION_FORM_KEY_PROCESS_ID, "Zeno",
+        Map.of(TestWorkflowService.FORM_NAME_VARIABLE, "the-standard-form"));
+
+    // the engine really computes two different strings out of that one form key, so a reading
+    // which asks the task rather than the model would report two tasks here
+    assertEquals(
+        Set.of("the-express-form", "the-standard-form"),
+        engine
+            .getTaskService()
+            .createTaskQuery()
+            .taskDefinitionKey(TestWorkflowService.EXPRESSION_FORM_KEY_TASK_ID)
+            .initializeFormKeys()
+            .list()
+            .stream()
+            .map(Task::getFormKey)
+            .collect(java.util.stream.Collectors.toSet()),
+        "the engine did not evaluate the form key, so this test proves nothing");
+
+    assertEquals(
+        TestWorkflowService.EXPRESSION_FORM_KEY,
+        taskDefinitionReadBackFor(
+            TestWorkflowService.EXPRESSION_FORM_KEY_PROCESS_ID, firstCase));
+    assertEquals(
+        TestWorkflowService.EXPRESSION_FORM_KEY,
+        taskDefinitionReadBackFor(
+            TestWorkflowService.EXPRESSION_FORM_KEY_PROCESS_ID, secondCase));
+
+    final var reported = CockpitServer
+        .awaitRequest(
+            "/usertask/created",
+            "\"bpmnTaskId\":\"%s\"".formatted(TestWorkflowService.EXPRESSION_FORM_KEY_TASK_ID));
+    assertTrue(
+        reported
+            .body()
+            .contains(
+                "\"taskDefinition\":\"%s\"".formatted(TestWorkflowService.EXPRESSION_FORM_KEY)),
+        reported.body());
+
+  }
+
   @Test
   @DisplayName("A task the engine has finished with is read from its history")
   public void aFinishedTaskIsReadFromHistory() {
@@ -504,6 +634,40 @@ public class Camunda7CockpitTest {
     assertEquals("Approve the order", prefill.get().bpmnTaskName());
     assertEquals(String.valueOf(aggregate.getId()), prefill.get().businessId());
     assertEquals(List.of(), prefill.get().candidateUsers());
+
+  }
+
+  @Test
+  @DisplayName("A workflow and its user task carry the version Camunda counted for the deployed process")
+  public void theCountedVersionIsWhatIsReported() {
+
+    final var aggregate = aStartedWorkflow("Vera");
+    final var userTaskId = userTaskIdOf(aggregate);
+    final var countedByCamunda = String
+        .valueOf(
+            engine
+                .getRepositoryService()
+                .createProcessDefinitionQuery()
+                .processDefinitionKey(TestWorkflowService.BPMN_PROCESS_ID)
+                .latestVersion()
+                .singleResult()
+                .getVersion());
+
+    final var workflows = bridge()
+        .workflowsOfAggregate(
+            MODULE_ID, TestWorkflowService.BPMN_PROCESS_ID, String.valueOf(aggregate.getId()));
+    assertEquals(1, workflows.size(), workflows.toString());
+    assertEquals(
+        countedByCamunda,
+        bridge().prefilledWorkflowDetails(workflows.getFirst()).orElseThrow().bpmnProcessVersion(),
+        "the workflow carries a version Camunda did not count");
+    assertEquals(
+        countedByCamunda,
+        bridge()
+            .prefilledUserTaskDetails(referenceOf(aggregate, userTaskId))
+            .orElseThrow()
+            .bpmnProcessVersion(),
+        "the user task carries a version Camunda did not count");
 
   }
 

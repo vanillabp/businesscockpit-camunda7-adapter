@@ -11,6 +11,7 @@ import org.camunda.bpm.engine.impl.persistence.entity.ExecutionEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.vanillabp.camunda7.api.Camunda7Executions;
 import io.vanillabp.cockpit.extension.spi.BusinessCockpitEventPublisher;
 import io.vanillabp.cockpit.extension.spi.EventTransaction;
 import io.vanillabp.cockpit.extension.spi.UserTaskEventKind;
@@ -42,7 +43,7 @@ public class Camunda7CockpitEvents {
 
   private final Supplier<BusinessCockpitEventPublisher> publisher;
 
-  private final EventTransaction transaction;
+  private final Supplier<EventTransaction> transaction;
 
   /**
    * @param scope The engine these events come from
@@ -50,13 +51,15 @@ public class Camunda7CockpitEvents {
    * @param publisher Where an event is handed to, asked for on the first event rather than up
    *          front: the engine is built while the application is still wiring itself together,
    *          and the extension is built from the engines
-   * @param transaction Which transaction the outbox entry is written in
+   * @param transaction Which transaction the outbox entry is written in, asked for on the first
+   *          event for the same reason the publisher is: it is the engine's answer, and the
+   *          engine is still being built while this is
    */
   public Camunda7CockpitEvents(
       final Camunda7Scope scope,
       final Camunda7WorkflowProcesses processes,
       final Supplier<BusinessCockpitEventPublisher> publisher,
-      final EventTransaction transaction) {
+      final Supplier<EventTransaction> transaction) {
 
     this.scope = scope;
     this.processes = processes;
@@ -79,7 +82,7 @@ public class Camunda7CockpitEvents {
    */
   public EventTransaction transaction() {
 
-    return transaction;
+    return transaction.get();
 
   }
 
@@ -123,9 +126,10 @@ public class Camunda7CockpitEvents {
         .publishUserTaskEvent(
             new UserTaskReference(
                 scope.adapterId(), process.get().workflowModuleId(), process.get()
-                    .bpmnProcessId(), workflowAggregateId, rootProcessInstanceIdOf(
-                        execution), task.getId(), taskDefinition, bpmnTaskId),
-            kind, "%s#%s".formatted(task.getId(), task.getEventName()), OffsetDateTime.now(), transaction);
+                    .bpmnProcessId(), workflowAggregateId, Camunda7Executions
+                        .rootProcessInstanceIdOf(
+                            execution), task.getId(), taskDefinition, bpmnTaskId),
+            kind, "%s#%s".formatted(task.getId(), task.getEventName()), OffsetDateTime.now(), transaction());
 
   }
 
@@ -165,23 +169,7 @@ public class Camunda7CockpitEvents {
                 scope.adapterId(), process.get().workflowModuleId(), process.get()
                     .bpmnProcessId(), workflowAggregateId, event
                         .getProcessInstanceId()),
-            kind, event.getId(), timestampOf(event, kind), transaction);
-
-  }
-
-  /**
-   * The instance a business case is: a task of an embedded subprocess, of a parallel branch or
-   * of a called process belongs to the workflow its whole hierarchy hangs below. The engine
-   * records that instance on every execution; a workflow started before it kept that column
-   * falls back to the instance the task runs in.
-   */
-  private static String rootProcessInstanceIdOf(
-      final ExecutionEntity execution) {
-
-    final var root = execution.getRootProcessInstanceId();
-    return root == null
-        ? execution.getProcessInstanceId()
-        : root;
+            kind, event.getId(), timestampOf(event, kind), transaction());
 
   }
 

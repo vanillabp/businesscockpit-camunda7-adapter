@@ -23,6 +23,7 @@ import io.vanillabp.cockpit.camunda7.Camunda7UserTaskListener;
 import io.vanillabp.cockpit.extension.spi.BusinessCockpitBpmsBridge;
 import io.vanillabp.cockpit.extension.spi.UserTaskReference;
 import io.vanillabp.cockpit.extension.spi.WorkflowReference;
+import io.vanillabp.cockpit.extension.test.support.CockpitServer;
 import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 import jakarta.inject.Inject;
 import jakarta.transaction.UserTransaction;
@@ -54,8 +55,10 @@ public class Camunda7CockpitTest {
               .addClass(TestAggregate.class)
               .addClass(TestAggregatePersistence.class)
               .addClass(TestWorkflowService.class)
-              // the test class runs in the application's class loader, so the server it asks
-              // about what arrived has to be reachable from there as well
+              // this test class is initialized twice, once while the application is built
+              // and again inside the class loader of the running application. The copy
+              // inside that application needs the server class as well, or the assertions
+              // run against a class nobody loaded there
               .addClass(CockpitServer.class))
       .overrideRuntimeConfigKey(
           "vanillabp.cockpit.rest.base-url", CockpitServer.baseUrl());

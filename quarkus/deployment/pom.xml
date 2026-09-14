@@ -79,6 +79,12 @@
       <artifactId>test-utils</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <!-- the cockpit server the tests report to, shared with the other extension repositories -->
+      <groupId>io.vanillabp.businesscockpit</groupId>
+      <artifactId>extensions-commons-test-support</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>

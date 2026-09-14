@@ -24,6 +24,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import io.vanillabp.camunda7.engine.Camunda7EngineCustomizer;
 import io.vanillabp.cockpit.extension.spi.BusinessCockpitBpmsBridge;
 import io.vanillabp.cockpit.extension.spi.UserTaskReference;
+import io.vanillabp.cockpit.extension.test.support.CockpitServer;
 import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 
 /**
@@ -159,7 +160,9 @@ public class Camunda7HistoryActivityTest {
   /**
    * The report of this test's own workflow. The cockpit server is shared by every test class of
    * this module, so a report is told from another one's by what it carries rather than by being
-   * the only one which arrived.
+   * the only one which arrived. What tells them apart is the case, not its id: every context of
+   * this module runs on a database of its own and counts its cases up from one, so an id alone
+   * names a case per context.
    *
    * @param pathSuffix What the path of the report ends with
    * @param carrying What its body has to contain
@@ -216,19 +219,21 @@ public class Camunda7HistoryActivityTest {
 
     final var aggregate = aStartedWorkflow("Pina");
     final var userTaskId = userTaskIdOf(aggregate);
+    final var thisCase = "\"customer\":\"Pina\"";
     final var businessId = "\"businessId\":\"%s\"".formatted(aggregate.getId());
     final var workflowId = workflowIdOf(aggregate);
 
-    final var workflow = awaitReport("/workflow/created", businessId);
-    assertTrue(workflow.contains("\"customer\":\"Pina\""), workflow);
+    final var workflow = awaitReport("/workflow/created", thisCase);
+    assertTrue(workflow.contains(businessId), workflow);
 
-    final var userTask = awaitReport("/usertask/created", businessId);
+    final var userTask = awaitReport("/usertask/created", thisCase);
+    assertTrue(userTask.contains(businessId), userTask);
     assertTrue(userTask.contains("\"event\":\"CREATED\""), userTask);
     assertTrue(
         userTask.contains("\"taskDefinition\":\"%s\"".formatted(TestWorkflowService.TASK_DEFINITION)),
         userTask);
     // the details provider ran, which means the task's variables were readable at this level
-    assertTrue(userTask.contains("\"customer\":\"Pina\""), userTask);
+    assertTrue(userTask.contains(thisCase), userTask);
 
     engine.getTaskService().complete(userTaskId);
 

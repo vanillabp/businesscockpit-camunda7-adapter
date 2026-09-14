@@ -20,6 +20,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import io.vanillabp.cockpit.extension.spi.BusinessCockpitBpmsBridge;
+import io.vanillabp.cockpit.extension.test.support.CockpitServer;
 import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 
 /**
@@ -107,20 +108,26 @@ public class Camunda7UsePrefixTest {
 
   /**
    * The report about this test's own case, told apart from whatever a context of another test
-   * class reports to the same server while this one waits.
+   * class reports to the same server while this one waits. The case is named by its customer
+   * rather than by its id: every context of this module runs on a database of its own and
+   * counts its cases up from one, so an id alone names a case per context.
+   *
+   * @param pathSuffix What the path of the report ends with
+   * @param customer The case this test started
+   * @return The body of the report
    */
   private String awaitReportOf(
       final String pathSuffix,
-      final TestAggregate aggregate) {
+      final String customer) {
 
-    final var businessId = "\"businessId\":\"%s\"".formatted(aggregate.getId());
+    final var thisCase = "\"customer\":\"%s\"".formatted(customer);
     final var deadline = System.currentTimeMillis() + 30000;
     while (System.currentTimeMillis() < deadline) {
       final var reported = CockpitServer
           .matching(pathSuffix)
           .stream()
           .map(CockpitServer.Request::body)
-          .filter(body -> body.contains(businessId))
+          .filter(body -> body.contains(thisCase))
           .findFirst();
       if (reported.isPresent()) {
         return reported.get();
@@ -128,9 +135,9 @@ public class Camunda7UsePrefixTest {
       sleep();
     }
     throw new AssertionError(
-        "Nothing ending in '%s' was reported for aggregate %s. Received: %s"
+        "Nothing ending in '%s' was reported for the case of '%s'. Received: %s"
             .formatted(
-                pathSuffix, aggregate.getId(),
+                pathSuffix, customer,
                 CockpitServer.received().stream().map(CockpitServer.Request::path).toList()));
 
   }
@@ -171,10 +178,13 @@ public class Camunda7UsePrefixTest {
     assertNull(deployed.getTenantId(), "use-prefix deployed a tenant");
 
     final var bpmnProcessId = "\"bpmnProcessId\":\"%s\"".formatted(TestWorkflowService.BPMN_PROCESS_ID);
-    final var workflow = awaitReportOf("/workflow/created", aggregate);
+    final var businessId = "\"businessId\":\"%s\"".formatted(aggregate.getId());
+    final var workflow = awaitReportOf("/workflow/created", "Petra");
     assertTrue(workflow.contains(bpmnProcessId), workflow);
-    final var userTask = awaitReportOf("/usertask/created", aggregate);
+    assertTrue(workflow.contains(businessId), workflow);
+    final var userTask = awaitReportOf("/usertask/created", "Petra");
     assertTrue(userTask.contains(bpmnProcessId), userTask);
+    assertTrue(userTask.contains(businessId), userTask);
 
   }
 

@@ -1,6 +1,8 @@
 package io.vanillabp.cockpit.camunda7;
 
-import io.vanillabp.camunda7.wiring.Camunda7Scoping;
+import java.util.function.Supplier;
+
+import io.vanillabp.camunda7.api.Camunda7EngineFacts;
 import io.vanillabp.integration.adapter.spi.NameClashAvoidanceSupport;
 
 /**
@@ -9,9 +11,17 @@ import io.vanillabp.integration.adapter.spi.NameClashAvoidanceSupport;
  * Name-clash avoidance decides whether a workflow module's processes are deployed under a
  * tenant, under a prefixed process id or under neither, and every query the extension sends to
  * an engine has to spell the id the way that engine stores it. The rules are the adapter's, so
- * they are asked of the adapter's own helper rather than rebuilt here: a prefix which the
- * extension assembles itself is a prefix which drifts apart from the adapter's on the next
- * change.
+ * they are asked of the adapter rather than rebuilt here: a prefix which the extension
+ * assembles itself is a prefix which drifts apart from the adapter's on the next change.
+ * <p>
+ * The tenant is the adapter's own answer, not a property read a second time. It may be
+ * configured for a workflow module and for the adapter, and which of the two a module runs
+ * under is what the adapter resolves when it deploys that module. Asking anywhere else means
+ * querying a tenant the engine never stored.
+ * <p>
+ * That answer is asked for when it is needed rather than when this scope is built. An engine is
+ * built with what this extension contributes to it, so there is nothing to ask about the engine
+ * while it is being built; by the time anything is reported or read back it exists.
  */
 public final class Camunda7Scope {
 
@@ -19,21 +29,21 @@ public final class Camunda7Scope {
 
   private final NameClashAvoidanceSupport scoping;
 
-  private final String configuredTenantId;
+  private final Supplier<Camunda7EngineFacts> engine;
 
   /**
    * @param adapterId The configured adapter id whose engine this scope belongs to
    * @param scoping VanillaBP's name-clash avoidance
-   * @param configuredTenantId What the adapter was configured with, or <code>null</code>
+   * @param engine What the Camunda 7 adapter knows about that engine
    */
   public Camunda7Scope(
       final String adapterId,
       final NameClashAvoidanceSupport scoping,
-      final String configuredTenantId) {
+      final Supplier<Camunda7EngineFacts> engine) {
 
     this.adapterId = adapterId;
     this.scoping = scoping;
-    this.configuredTenantId = configuredTenantId;
+    this.engine = engine;
 
   }
 
@@ -54,7 +64,7 @@ public final class Camunda7Scope {
   public String tenantIdOf(
       final String workflowModuleId) {
 
-    return Camunda7Scoping.tenantIdFor(scoping, workflowModuleId, adapterId, configuredTenantId);
+    return engine.get().tenantIdOf(workflowModuleId);
 
   }
 

@@ -5,8 +5,9 @@ import org.camunda.bpm.engine.impl.bpmn.behavior.UserTaskActivityBehavior;
 import org.camunda.bpm.engine.impl.bpmn.parser.AbstractBpmnParseListener;
 import org.camunda.bpm.engine.impl.pvm.process.ActivityImpl;
 import org.camunda.bpm.engine.impl.pvm.process.ScopeImpl;
-import org.camunda.bpm.engine.impl.task.TaskDefinition;
 import org.camunda.bpm.engine.impl.util.xml.Element;
+
+import io.vanillabp.camunda7.api.Camunda7TaskDefinitions;
 
 /**
  * Attaches the Business Cockpit's task listeners while the engine parses a user task.
@@ -19,7 +20,9 @@ import org.camunda.bpm.engine.impl.util.xml.Element;
  * only the two VanillaBP itself needs.
  * <p>
  * The listener carries the element id and the form key it was parsed with, so a runtime event
- * needs neither a model lookup nor a registry of its own.
+ * needs neither a model lookup nor a registry of its own. What the cockpit calls the task is
+ * the Camunda 7 adapter's own rule: the form key the modeller wrote, and the element id where
+ * the model carries none, because a task without a form is still a task somebody has to see.
  * <p>
  * Why built-in and why after VanillaBP's own is decision 1 in the repository's DECISIONS.md, and
  * that every user task gets them whether or not the application enriches it is decision 2 in the
@@ -59,31 +62,11 @@ public class Camunda7UserTaskParseListener extends AbstractBpmnParseListener {
     }
     final var taskDefinition = behavior.getTaskDefinition();
     final var listener = new Camunda7UserTaskListener(
-        events, activity.getId(), taskDefinitionOf(taskDefinition, activity.getId()));
+        events, activity.getId(), Camunda7TaskDefinitions
+            .of(Camunda7TaskDefinitions.formKeyOf(taskDefinition), activity.getId()));
     for (final var eventName : EVENT_NAMES) {
       taskDefinition.addBuiltInTaskListener(eventName, listener);
     }
-
-  }
-
-  /**
-   * What the cockpit calls this task: the form key the modeller wrote, which is what a
-   * <code>&#64;UserTaskDetailsProvider</code> names and what the cockpit shows a form for. A
-   * task without a form key is still a task somebody has to see, so it falls back to its
-   * element id - the same fallback the VanillaBP Camunda 7 adapter makes for its own wiring.
-   */
-  private static String taskDefinitionOf(
-      final TaskDefinition taskDefinition,
-      final String bpmnTaskId) {
-
-    final var formKey = taskDefinition.getFormKey();
-    if (formKey == null) {
-      return bpmnTaskId;
-    }
-    final var written = formKey.getExpressionText();
-    return (written == null) || written.isBlank()
-        ? bpmnTaskId
-        : written;
 
   }
 

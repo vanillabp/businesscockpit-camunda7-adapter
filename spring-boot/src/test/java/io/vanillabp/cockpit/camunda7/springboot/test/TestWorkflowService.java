@@ -29,7 +29,11 @@ import io.vanillabp.spi.service.WorkflowService;
 @Service
 @WorkflowService(workflowAggregateClass = TestAggregate.class,
     bpmnProcess = @BpmnProcess(bpmnProcessId = TestWorkflowService.BPMN_PROCESS_ID),
-    secondaryBpmnProcesses = @BpmnProcess(bpmnProcessId = TestWorkflowService.MULTI_INSTANCE_PROCESS_ID))
+    secondaryBpmnProcesses = {
+        @BpmnProcess(bpmnProcessId = TestWorkflowService.MULTI_INSTANCE_PROCESS_ID), @BpmnProcess(
+            bpmnProcessId = TestWorkflowService.NO_FORM_KEY_PROCESS_ID), @BpmnProcess(
+                bpmnProcessId = TestWorkflowService.EXPRESSION_FORM_KEY_PROCESS_ID)
+    })
 public class TestWorkflowService {
 
   /** The BPMN process of the test. */
@@ -58,6 +62,30 @@ public class TestWorkflowService {
    * <code>&#64;TaskParam</code> of an enclosing scope is bound from.
    */
   public static final String ORDER_KIND_VARIABLE = "orderKind";
+
+  /** A BPMN process whose user task carries no form key at all. */
+  public static final String NO_FORM_KEY_PROCESS_ID = "NoFormKeyProcess";
+
+  /**
+   * The BPMN element id of that user task, which is what the cockpit has to call it: a task
+   * without a form key falls back to its element id.
+   */
+  public static final String NO_FORM_KEY_TASK_ID = "NFK_Approve";
+
+  /** A BPMN process whose user task names its form by an expression. */
+  public static final String EXPRESSION_FORM_KEY_PROCESS_ID = "ExpressionFormKeyProcess";
+
+  /** The BPMN element id of that user task. */
+  public static final String EXPRESSION_FORM_KEY_TASK_ID = "EFK_Approve";
+
+  /**
+   * The form key that user task carries, as the modeller wrote it. What the engine computes
+   * out of it differs per workflow instance, which is the point of the tests using it.
+   */
+  public static final String EXPRESSION_FORM_KEY = "${formName}";
+
+  /** The variable that expression reads, set to another value per workflow instance. */
+  public static final String FORM_NAME_VARIABLE = "formName";
 
   /** What the details provider writes into the aggregate, so that a test can see it ran. */
   public static final String APPROVE_NOTE = "seen by the details provider";

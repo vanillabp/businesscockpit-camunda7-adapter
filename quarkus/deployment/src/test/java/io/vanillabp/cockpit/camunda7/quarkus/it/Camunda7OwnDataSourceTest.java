@@ -15,27 +15,31 @@ import io.quarkus.test.QuarkusExtensionTest;
 import io.vanillabp.camunda7.quarkus.runtime.VanillaBpCamunda7Properties;
 import io.vanillabp.cockpit.camunda7.Camunda7CockpitCustomizer;
 import io.vanillabp.cockpit.extension.spi.EventTransaction;
+import io.vanillabp.cockpit.extension.test.support.CockpitServer;
 import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 import jakarta.inject.Inject;
 import jakarta.transaction.UserTransaction;
 
 /**
- * A Quarkus application whose engine writes into a database of its own, and what that does not
- * change: the engine still runs its commands in the transaction of whoever called it, because
- * this platform builds it on the container's transaction manager. So a workflow which was rolled
- * back leaves nothing behind, here as anywhere else.
+ * A Quarkus application whose engine writes into a database of its own, and what a workflow it
+ * rolled back leaves behind.
  * <p>
- * The two assertions of the rollback test belong together. That nothing arrives at the cockpit
- * server is what an application is promised, but it would also hold while an outbox entry was
- * written outside the rolled-back transaction and dropped much later, when the dispatcher asked
- * the engine about a workflow it had never committed. What has to be true for the promise to be
- * kept is that the entry was never written, and that is what the second assertion pins: the
- * platform says this engine joins the application's transaction although it was given a data
- * source name - see decision 6 in the repository's DECISIONS.md.
+ * The engine writes to a resource the application's own persistence does not take part in. Two
+ * data sources in one JTA transaction are still two commits, so the outbox entry reporting what
+ * the engine did cannot ride the engine's commit however the container enlists them. The entry
+ * therefore gets a transaction of its own, and that is the honest answer rather than a correct
+ * one: entry and engine work commit separately, and the entry of a workflow the engine rolled
+ * back is written and stays. What keeps such a workflow out of the cockpit is the dispatch. It
+ * asks the engine about the workflow, the engine holds none, and an event about a workflow
+ * nobody knows is dropped rather than sent.
+ * <p>
+ * Whether an engine shares the caller's transaction is the Camunda 7 adapter's answer, read off
+ * the engine that adapter built. This test pins what it answers for an engine with a data source
+ * of its own, because that answer is what decides where the entry goes.
  * <p>
  * Both data sources of this application are configured as XA, which is what an application with
- * an engine database of its own has to do on Quarkus: the entry and the engine's work are two
- * data sources in one JTA transaction, and Agroal enlists a second one only as an XA resource.
+ * an engine database of its own has to do on Quarkus: Agroal enlists a second data source only
+ * as an XA resource, and without it writing the entry fails while the engine works.
  */
 @ExtendWith(SuppressOutputExtension.class)
 @SuppressOutputExtension.SuppressBackgroundOutput
@@ -54,6 +58,10 @@ public class Camunda7OwnDataSourceTest {
               .addClass(TestAggregate.class)
               .addClass(TestAggregatePersistence.class)
               .addClass(TestWorkflowService.class)
+              // this test class is initialized twice, once while the application is built
+              // and again inside the class loader of the running application. The copy
+              // inside that application needs the server class as well, or the assertions
+              // run against a class nobody loaded there
               .addClass(CockpitServer.class))
       .overrideRuntimeConfigKey(
           "vanillabp.cockpit.rest.base-url", CockpitServer.baseUrl());
@@ -70,6 +78,11 @@ public class Camunda7OwnDataSourceTest {
   @Inject
   Camunda7CockpitCustomizer customizer;
 
+  /**
+   * Nothing about the rolled-back workflow reaches the cockpit server. The entry reporting it
+   * was written all the same, in a transaction of its own, which is what the second assertion
+   * names and why the first one is about the server rather than about the store.
+   */
   @Test
   @DisplayName("A workflow rolled back on an engine with a data source of its own is not reported")
   public void aRolledBackWorkflowIsNotReported() throws Exception {
@@ -101,9 +114,12 @@ public class Camunda7OwnDataSourceTest {
         "the cockpit was told about a workflow the engine rolled back");
 
     assertEquals(
-        EventTransaction.CURRENT,
+        EventTransaction.NEW,
         customizer.eventTransactionOf(ADAPTER_ID),
-        "the entry of an observed event would be written outside the transaction the engine works in");
+        """
+            the engine of this adapter id was given a data source of its own, so its transaction \
+            never reaches the store the outbox entry is written into - an entry sharing it would \
+            be an entry whose commit says nothing about the engine's""");
 
   }
 

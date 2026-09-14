@@ -50,12 +50,14 @@ public class Camunda7CockpitBeanRegistrar implements BeanRegistrar {
                     "BusinessCockpit_Camunda7_Bridge_%s".formatted(adapterId),
                     BusinessCockpitBpmsBridge.class,
                     spec -> spec
-                        .supplier(
-                            supplierContext -> new Camunda7CockpitBridge(
-                                supplierContext
-                                    .bean(Camunda7CockpitCustomizer.class)
-                                    .scopeOf(adapterId), supplierContext.bean(
-                                        Camunda7WorkflowProcesses.class), engineOf(supplierContext, adapterId)))));
+                        .supplier(supplierContext -> {
+                          final var customizer = supplierContext
+                              .bean(Camunda7CockpitCustomizer.class);
+                          return new Camunda7CockpitBridge(
+                              customizer.scopeOf(adapterId), customizer
+                                  .engineOf(adapterId), supplierContext.bean(
+                                      Camunda7WorkflowProcesses.class), engineOf(supplierContext, adapterId));
+                        })));
 
   }
 
