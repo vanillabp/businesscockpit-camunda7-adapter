@@ -20,6 +20,7 @@ import org.camunda.bpm.engine.task.IdentityLinkType;
 import org.camunda.bpm.engine.task.Task;
 
 import io.vanillabp.camunda7.Camunda7Adapter;
+import io.vanillabp.camunda7.api.Camunda7Executions;
 import io.vanillabp.camunda7.api.Camunda7MultiInstances;
 import io.vanillabp.cockpit.extension.spi.BusinessCockpitBpmsBridge;
 import io.vanillabp.cockpit.extension.spi.UserTaskDetailsPrefill;
@@ -246,9 +247,11 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         .map(
             process -> new UserTaskReference(
                 scope.adapterId(), process.workflowModuleId(), process
-                    .bpmnProcessId(), workflowAggregateId, rootWorkflowIdOf(
-                        task.getProcessInstanceId()), task.getId(), taskDefinitionOf(
-                            task.getFormKey(), task.getTaskDefinitionKey()), task.getTaskDefinitionKey()));
+                    .bpmnProcessId(), workflowAggregateId, Camunda7Executions
+                        .rootProcessInstanceIdOf(
+                            engine.getHistoryService(), task
+                                .getProcessInstanceId()), task.getId(), taskDefinitionOf(
+                                    task.getFormKey(), task.getTaskDefinitionKey()), task.getTaskDefinitionKey()));
 
   }
 
@@ -265,7 +268,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         .bpmnProcessVersion(versionOf(definition))
         .bpmnProcessName(processNameOf(definition, bpmnProcessId))
         .bpmnTaskName(task.getName())
-        .workflowId(workflow == null ? null : rootIdOf(workflow))
+        .workflowId(Camunda7Executions.rootProcessInstanceIdOf(workflow))
         .subWorkflowId(subWorkflowIdOf(workflow))
         .businessId(workflow == null ? null : workflow.getBusinessKey())
         .initiator(workflow == null ? null : workflow.getStartUserId())
@@ -284,6 +287,10 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
    * A task the engine has finished with. History records what the task looked like and, where
    * the engine keeps an identity-link log, who its candidates were; the variables it saw are
    * not read, and a details provider of such a task therefore sees none.
+   * <p>
+   * The business case the task belongs to is read off the process instance rather than off the
+   * task, although the task records it too: the instance is in hand here anyway, and taking it
+   * from one place means one rule about what a root is.
    */
   private UserTaskDetailsPrefill prefillOf(
       final HistoricTaskInstance task,
@@ -298,7 +305,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         .bpmnProcessVersion(versionOf(definition))
         .bpmnProcessName(processNameOf(definition, bpmnProcessId))
         .bpmnTaskName(task.getName())
-        .workflowId(task.getRootProcessInstanceId())
+        .workflowId(Camunda7Executions.rootProcessInstanceIdOf(workflow))
         .subWorkflowId(subWorkflowIdOf(workflow))
         .businessId(workflow == null ? null : workflow.getBusinessKey())
         .initiator(workflow == null ? null : workflow.getStartUserId())
@@ -424,29 +431,6 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
 
   }
 
-  private String rootWorkflowIdOf(
-      final String processInstanceId) {
-
-    final var workflow = historicWorkflow(processInstanceId);
-    return workflow == null
-        ? processInstanceId
-        : rootIdOf(workflow);
-
-  }
-
-  /**
-   * The instance a business case is. Camunda records it, and it falls back to the instance
-   * itself for a workflow started before the engine kept that column.
-   */
-  private static String rootIdOf(
-      final HistoricProcessInstance workflow) {
-
-    return workflow.getRootProcessInstanceId() == null
-        ? workflow.getId()
-        : workflow.getRootProcessInstanceId();
-
-  }
-
   /** Named only where the task really sits in a called process. */
   private static String subWorkflowIdOf(
       final HistoricProcessInstance workflow) {
@@ -454,7 +438,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
     if (workflow == null) {
       return null;
     }
-    return workflow.getId().equals(rootIdOf(workflow))
+    return workflow.getId().equals(Camunda7Executions.rootProcessInstanceIdOf(workflow))
         ? null
         : workflow.getId();
 

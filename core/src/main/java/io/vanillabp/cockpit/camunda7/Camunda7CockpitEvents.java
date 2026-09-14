@@ -11,6 +11,7 @@ import org.camunda.bpm.engine.impl.persistence.entity.ExecutionEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.vanillabp.camunda7.api.Camunda7Executions;
 import io.vanillabp.cockpit.extension.spi.BusinessCockpitEventPublisher;
 import io.vanillabp.cockpit.extension.spi.EventTransaction;
 import io.vanillabp.cockpit.extension.spi.UserTaskEventKind;
@@ -123,8 +124,9 @@ public class Camunda7CockpitEvents {
         .publishUserTaskEvent(
             new UserTaskReference(
                 scope.adapterId(), process.get().workflowModuleId(), process.get()
-                    .bpmnProcessId(), workflowAggregateId, rootProcessInstanceIdOf(
-                        execution), task.getId(), taskDefinition, bpmnTaskId),
+                    .bpmnProcessId(), workflowAggregateId, Camunda7Executions
+                        .rootProcessInstanceIdOf(
+                            execution), task.getId(), taskDefinition, bpmnTaskId),
             kind, "%s#%s".formatted(task.getId(), task.getEventName()), OffsetDateTime.now(), transaction);
 
   }
@@ -166,22 +168,6 @@ public class Camunda7CockpitEvents {
                     .bpmnProcessId(), workflowAggregateId, event
                         .getProcessInstanceId()),
             kind, event.getId(), timestampOf(event, kind), transaction);
-
-  }
-
-  /**
-   * The instance a business case is: a task of an embedded subprocess, of a parallel branch or
-   * of a called process belongs to the workflow its whole hierarchy hangs below. The engine
-   * records that instance on every execution; a workflow started before it kept that column
-   * falls back to the instance the task runs in.
-   */
-  private static String rootProcessInstanceIdOf(
-      final ExecutionEntity execution) {
-
-    final var root = execution.getRootProcessInstanceId();
-    return root == null
-        ? execution.getProcessInstanceId()
-        : root;
 
   }
 
