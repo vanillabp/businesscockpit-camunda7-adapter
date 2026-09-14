@@ -19,8 +19,10 @@ import io.vanillabp.integration.extension.spi.ExtensionWiringService;
  * attached while the engine parses it, which is what the engine customizer of this extension
  * does; a model this extension rewrote would be a model the modeller no longer recognizes.
  * <p>
- * The order is the Business Cockpit's own, the last one, so whatever an adapter or another
- * extension does to a model has happened by the time this runs.
+ * The order is the Business Cockpit's own, and {@link BusinessCockpitWiringService#ORDER} says
+ * what that number means. What this class reads is a model the Camunda 7 adapter has already
+ * wired, and that comes from the pipeline calling the adapter before any extension rather
+ * than from the number.
  * <p>
  * Why the processes are remembered rather than derived from an engine's identifiers later is
  * decision 4 in the repository's DECISIONS.md.
