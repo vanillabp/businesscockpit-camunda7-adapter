@@ -97,7 +97,7 @@ the two can leave the cockpit told about something the engine rolled back, or th
 The engine's own transaction is the only place that could be fixed, and an engine which does not
 share the application's data source has no such place.
 
-## 6. Which transaction the entry is written in is answered by the platform, not by a property
+## 6. Which transaction the entry is written in is answered by the platform, not by a property - the Quarkus answer superseded by decision 9
 
 The entry reporting what the engine did belongs in the transaction that work happens in: the
 cockpit then hears about a task if and only if the workflow which created it was committed, and a
@@ -175,3 +175,27 @@ Where an event the cockpit reads is missing, the boot ends with a message naming
 level, the events it does not write, the lowest level which writes them and the fact that the
 engine's own default already does - so an application which never touched the level will never
 see it.
+
+## 9. The adapter answers whether the entry joins the engine's transaction, and it answers the same on both platforms
+
+The guarantee is the one decision 6 wrote down and it has not changed: the entry reporting what
+the engine did belongs in the transaction that work happens in, so a rolled-back workflow leaves
+nothing behind. What changed is who answers the question and what the answer is on Quarkus.
+
+The Camunda 7 adapter answers it now, as `Camunda7EngineFacts.joinsTheApplicationTransaction()`,
+and the answer is the same sentence on both platforms: an engine which runs on a data source of
+its own does not join the caller's transaction, so the entry gets a transaction of its own.
+
+Decision 6 said the opposite for Quarkus. It argued that the container's transaction manager
+makes every command join the transaction of whoever called it, and that a named data source
+decides only which database is written to. That is true about enlistment and untrue about
+atomicity. A JTA transaction around two data sources which are not XA is still two commits, so
+the entry and the engine's work were never committed together; what the old answer bought was
+the appearance of one transaction, and the price it named was configuring both data sources as
+XA. That price is gone with the answer.
+
+What an application gives up is what the Spring Boot half of decision 6 already named as the
+honest answer rather than the correct one: entry and engine work commit separately, and a crash
+between the two can leave the cockpit told about something the engine rolled back. An
+application which wants them committed together puts the engine on the application's data
+source, and then this answer is `true` on either platform.
