@@ -53,9 +53,10 @@ What the core does, class by class:
   one outbox entry.
 - `Camunda7CockpitBridge` answers everything the cockpit reads back about a task or a workflow,
   which happens when the entry is dispatched and the engine's transaction is long committed.
-- `Camunda7Scope` and `Camunda7EngineSettings` are how the extension asks the adapter what an
-  engine calls things and how the platform modules say whether the engine's work runs in the
-  application's transaction, rather than building a prefix, a tenant or an answer of its own.
+- `Camunda7Scope` is how the extension asks what an engine calls things, rather than building a
+  prefix or a tenant of its own. The tenant a workflow module was deployed under and whether the
+  engine's work runs in the caller's transaction are the Camunda 7 adapter's own answers, which
+  the extension reads per configured adapter id.
 
 The decisions these classes rest on are numbered in [`DECISIONS.md`](./DECISIONS.md), and what a
 user of this extension has to know is in the
@@ -75,10 +76,10 @@ BPMN process and a serialized id, and the store the matching aggregate's transac
 one it lands in. An application whose aggregates live in two persistences therefore needs nothing
 extra here.
 
-And it has no configuration key of its own. What this half has to know about an engine, the tenant
-a workflow module was deployed under, it reads from the Camunda 7 adapter's own section of
-`vanillabp.adapters.<id>.*`; whether the outbox entry can share the engine's transaction is
-answered by the platform rather than by a key.
+And it has no configuration key of its own. What this half has to know about an engine it asks
+the Camunda 7 adapter: the tenant a workflow module was deployed under, and whether the outbox
+entry can share the engine's transaction. Both are answers the adapter acts on itself, so the
+extension cannot disagree with the engine it listens to.
 
 ## Building
 

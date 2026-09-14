@@ -23,6 +23,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import io.vanillabp.camunda7.api.Camunda7EngineFacts;
+import io.vanillabp.camunda7.wiring.Camunda7TaskRegistry;
 import io.vanillabp.cockpit.camunda7.Camunda7CockpitEvents;
 import io.vanillabp.cockpit.camunda7.Camunda7Scope;
 import io.vanillabp.cockpit.camunda7.Camunda7WorkflowHistoryHandler;
@@ -66,9 +68,11 @@ public class Camunda7CockpitEventsTest {
     processes.register(MODULE_ID, BPMN_PROCESS_ID);
     // the real name-clash avoidance of an application which configured none, which resolves to
     // 'by-adapter': the workflow module is a tenant of its own and the process id stays plain
+    final var scoping = new NameClashAvoidanceService(new MigrationAdapterProperties());
+    final var engine = new Camunda7EngineFacts(
+        ADAPTER_ID, scoping, workflowModuleId -> null, new Camunda7TaskRegistry());
     events = new Camunda7CockpitEvents(
-        new Camunda7Scope(
-            ADAPTER_ID, new NameClashAvoidanceService(new MigrationAdapterProperties()), null), processes, () -> publisher, EventTransaction.CURRENT);
+        new Camunda7Scope(ADAPTER_ID, scoping, () -> engine), processes, () -> publisher, () -> EventTransaction.CURRENT);
 
   }
 

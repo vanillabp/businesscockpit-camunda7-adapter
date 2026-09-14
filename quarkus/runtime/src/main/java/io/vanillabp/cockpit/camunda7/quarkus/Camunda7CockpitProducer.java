@@ -7,8 +7,8 @@ import org.camunda.bpm.model.bpmn.BpmnModelInstance;
 import io.quarkus.arc.Unremovable;
 import io.vanillabp.camunda7.Camunda7Adapter;
 import io.vanillabp.camunda7.Camunda7ProcessingContext;
+import io.vanillabp.camunda7.api.Camunda7EngineFacts;
 import io.vanillabp.camunda7.quarkus.runtime.Camunda7QuarkusEngineRegistry;
-import io.vanillabp.camunda7.quarkus.runtime.VanillaBpCamunda7Properties;
 import io.vanillabp.cockpit.camunda7.Camunda7CockpitBridge;
 import io.vanillabp.cockpit.camunda7.Camunda7CockpitCustomizer;
 import io.vanillabp.cockpit.camunda7.Camunda7CockpitWiring;
@@ -68,7 +68,9 @@ public class Camunda7CockpitProducer {
    *
    * @param processes The deployed processes
    * @param scoping VanillaBP's name-clash avoidance
-   * @param properties The Camunda 7 adapter's own configuration
+   * @param engines What the Camunda 7 adapter knows about each of its engines, one entry per
+   *          configured adapter id. They are asked for when they are first needed rather than
+   *          now: each of them is built from an engine, and an engine is built from this bean
    * @param publisher Where an observed event is reported. It is resolved on the first event
    *          rather than now: this bean is asked for while an engine is being built, and the
    *          extension it would return is built from those engines
@@ -80,11 +82,10 @@ public class Camunda7CockpitProducer {
   public Camunda7CockpitCustomizer businessCockpitCamunda7EngineCustomizer(
       final Camunda7WorkflowProcesses processes,
       final NameClashAvoidanceSupport scoping,
-      final VanillaBpCamunda7Properties properties,
+      final Instance<List<Camunda7EngineFacts>> engines,
       final Instance<BusinessCockpitEventPublisher> publisher) {
 
-    return new Camunda7CockpitCustomizer(
-        processes, scoping, new Camunda7QuarkusSettings(properties), publisher::get);
+    return new Camunda7CockpitCustomizer(processes, scoping, engines::get, publisher::get);
 
   }
 

@@ -15,6 +15,7 @@ import org.camunda.bpm.engine.impl.history.HistoryLevel;
 import org.camunda.bpm.engine.impl.history.event.HistoryEventTypes;
 import org.camunda.bpm.engine.impl.history.handler.HistoryEventHandler;
 
+import io.vanillabp.camunda7.api.Camunda7EngineFacts;
 import io.vanillabp.camunda7.engine.Camunda7EngineCustomizer;
 import io.vanillabp.cockpit.extension.spi.BusinessCockpitEventPublisher;
 import io.vanillabp.cockpit.extension.spi.EventTransaction;
@@ -58,16 +59,23 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
 
   private final NameClashAvoidanceSupport scoping;
 
-  private final Camunda7EngineSettings settings;
+  private final Supplier<List<Camunda7EngineFacts>> engines;
 
   private final Supplier<BusinessCockpitEventPublisher> publisher;
 
   private final Map<String, Camunda7CockpitEvents> eventsByAdapterId = new ConcurrentHashMap<>();
 
+  private final Map<String, Camunda7Scope> scopesByAdapterId = new ConcurrentHashMap<>();
+
+  private final Map<String, Camunda7EngineFacts> enginesByAdapterId = new ConcurrentHashMap<>();
+
   /**
    * @param processes The deployed processes, shared with the wiring service which fills them
    * @param scoping VanillaBP's name-clash avoidance
-   * @param settings What the Camunda 7 adapter was configured with
+   * @param engines What the Camunda 7 adapter knows about each of its engines, one entry per
+   *          configured adapter id. It is a supplier because an engine is built with what this
+   *          customizer contributes to it, so there is nothing to ask about an engine while
+   *          this is being built
    * @param publisher Where events are handed to. It is a supplier because the extension is
    *          built from the BPMS halves and the BPMS halves from the engines, so asking for it
    *          while an engine is being built would close that circle
@@ -75,12 +83,12 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
   public Camunda7CockpitCustomizer(
       final Camunda7WorkflowProcesses processes,
       final NameClashAvoidanceSupport scoping,
-      final Camunda7EngineSettings settings,
+      final Supplier<List<Camunda7EngineFacts>> engines,
       final Supplier<BusinessCockpitEventPublisher> publisher) {
 
     this.processes = processes;
     this.scoping = scoping;
-    this.settings = settings;
+    this.engines = engines;
     this.publisher = publisher;
 
   }
@@ -236,8 +244,44 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
         .computeIfAbsent(
             adapterId,
             id -> new Camunda7CockpitEvents(
-                new Camunda7Scope(id, scoping, settings.configuredTenantId(id)), processes, publisher, transactionOf(
-                    id)));
+                scopeOf(id), processes, publisher, () -> transactionOf(id)));
+
+  }
+
+  /**
+   * What the Camunda 7 adapter knows about the engine of one adapter id, looked up once.
+   *
+   * @param adapterId The configured adapter id
+   * @return What that engine answers about itself
+   */
+  public Camunda7EngineFacts engineOf(
+      final String adapterId) {
+
+    return enginesByAdapterId
+        .computeIfAbsent(
+            adapterId,
+            id -> engines
+                .get()
+                .stream()
+                .filter(engine -> id.equals(engine.adapterId()))
+                .findFirst()
+                .orElseThrow(
+                    () -> new IllegalStateException(
+                        """
+                            The Business Cockpit extension found nothing the Camunda 7 adapter \
+                            knows about the engine of the adapter '%s', although VanillaBP counts \
+                            that id among the Camunda 7 adapters of this application. The adapter \
+                            publishes one entry per configured adapter id and published: %s. Add \
+                            the artifact 'org.camunda.community.vanillabp:camunda7-adapter' of \
+                            your platform to your workflow module: this extension listens to the \
+                            engines that adapter builds and has none of its own."""
+                            .formatted(
+                                id,
+                                engines
+                                    .get()
+                                    .stream()
+                                    .map(Camunda7EngineFacts::adapterId)
+                                    .toList()))));
 
   }
 
@@ -250,7 +294,8 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
   public Camunda7Scope scopeOf(
       final String adapterId) {
 
-    return eventsOf(adapterId).scope();
+    return scopesByAdapterId
+        .computeIfAbsent(adapterId, id -> new Camunda7Scope(id, scoping, () -> engineOf(id)));
 
   }
 
@@ -268,17 +313,19 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
   }
 
   /**
-   * Where the engine's work happens inside the application's transaction, the outbox entry
+   * Where the engine's work happens inside the transaction the caller is in, the outbox entry
    * belongs in that one: the cockpit then hears about a task if and only if the workflow which
    * created it was committed. Where it does not, there is no such transaction to join and the
-   * entry gets one of its own. Which of the two an engine is doing is a question about the
-   * platform's transaction integration rather than about a single property, so the platform
-   * modules answer it - see decision 6 in the repository's DECISIONS.md.
+   * entry gets one of its own.
+   * <p>
+   * Which of the two an engine is doing is the adapter's answer. It is read off the engine the
+   * adapter built rather than off a property, and an extension asking it itself would be a
+   * second reading of an engine somebody else assembled.
    */
   private EventTransaction transactionOf(
       final String adapterId) {
 
-    return settings.joinsTheApplicationTransaction(adapterId)
+    return engineOf(adapterId).joinsTheApplicationTransaction()
         ? EventTransaction.CURRENT
         : EventTransaction.NEW;
 

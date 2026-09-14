@@ -19,9 +19,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import io.vanillabp.camunda7.api.Camunda7EngineFacts;
 import io.vanillabp.camunda7.engine.Camunda7EngineCustomizers;
+import io.vanillabp.camunda7.wiring.Camunda7TaskRegistry;
 import io.vanillabp.cockpit.camunda7.Camunda7CockpitCustomizer;
-import io.vanillabp.cockpit.camunda7.Camunda7EngineSettings;
 import io.vanillabp.cockpit.camunda7.Camunda7WorkflowProcesses;
 import io.vanillabp.cockpit.extension.spi.EventTransaction;
 import io.vanillabp.integration.adapter.migration.config.MigrationAdapterProperties;
@@ -45,26 +46,13 @@ public class Camunda7EngineCustomizingTest {
 
   private static Camunda7CockpitCustomizer aCustomizer() {
 
+    final var scoping = new NameClashAvoidanceService(new MigrationAdapterProperties());
+    // what the adapter publishes about an engine nobody configured anything for: no tenant
+    // name, and a task registry which says the engine shares the application's data source
+    final var engine = new Camunda7EngineFacts(
+        ADAPTER_ID, scoping, workflowModuleId -> null, new Camunda7TaskRegistry());
     return new Camunda7CockpitCustomizer(
-        new Camunda7WorkflowProcesses(), new NameClashAvoidanceService(new MigrationAdapterProperties()), new Camunda7EngineSettings() {
-
-          @Override
-          public String configuredTenantId(
-              final String adapterId) {
-
-            return null;
-
-          }
-
-          @Override
-          public boolean joinsTheApplicationTransaction(
-              final String adapterId) {
-
-            return true;
-
-          }
-
-        }, RecordingPublisher::new);
+        new Camunda7WorkflowProcesses(), scoping, () -> List.of(engine), RecordingPublisher::new);
 
   }
 

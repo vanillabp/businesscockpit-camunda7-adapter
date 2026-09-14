@@ -4,13 +4,12 @@ import org.camunda.bpm.model.bpmn.BpmnModelInstance;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 
 import io.vanillabp.camunda7.Camunda7ProcessingContext;
+import io.vanillabp.camunda7.api.Camunda7EngineFacts;
 import io.vanillabp.camunda7.engine.Camunda7EngineCustomizer;
-import io.vanillabp.camunda7.springboot.VanillaBpCamunda7Properties;
 import io.vanillabp.cockpit.camunda7.Camunda7CockpitCustomizer;
 import io.vanillabp.cockpit.camunda7.Camunda7CockpitWiring;
 import io.vanillabp.cockpit.camunda7.Camunda7WorkflowProcesses;
@@ -32,7 +31,6 @@ import io.vanillabp.integration.extension.spi.ExtensionWiringService;
  */
 @AutoConfiguration(afterName = "io.vanillabp.integration.processservice.SpringBootMigrationAdapterAutoConfiguration")
 @ConditionalOnBean(MigrationAdapterProperties.class)
-@EnableConfigurationProperties(VanillaBpCamunda7Properties.class)
 @Import(Camunda7CockpitBeanRegistrar.class)
 public class Camunda7CockpitAutoConfiguration {
 
@@ -70,7 +68,9 @@ public class Camunda7CockpitAutoConfiguration {
    *
    * @param processes The deployed processes
    * @param scoping VanillaBP's name-clash avoidance
-   * @param properties The Camunda 7 adapter's own configuration
+   * @param engines What the Camunda 7 adapter knows about each of its engines, one bean per
+   *          configured adapter id. They are collected when they are first needed rather than
+   *          now: each of them is built from an engine, and an engine is built from this bean
    * @param publisher Where an observed event is reported. It is resolved on the first event
    *          rather than now: this bean is asked for while an engine is being built, and the
    *          extension it would return is built from those engines
@@ -80,11 +80,11 @@ public class Camunda7CockpitAutoConfiguration {
   public Camunda7CockpitCustomizer businessCockpitCamunda7EngineCustomizer(
       final Camunda7WorkflowProcesses processes,
       final NameClashAvoidanceSupport scoping,
-      final VanillaBpCamunda7Properties properties,
+      final ObjectProvider<Camunda7EngineFacts> engines,
       final ObjectProvider<BusinessCockpitEventPublisher> publisher) {
 
     return new Camunda7CockpitCustomizer(
-        processes, scoping, new Camunda7SpringSettings(properties), publisher::getObject);
+        processes, scoping, () -> engines.stream().toList(), publisher::getObject);
 
   }
 
