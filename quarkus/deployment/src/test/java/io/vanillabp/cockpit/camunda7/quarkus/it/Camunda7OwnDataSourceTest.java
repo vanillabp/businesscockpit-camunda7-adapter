@@ -15,6 +15,7 @@ import io.quarkus.test.QuarkusExtensionTest;
 import io.vanillabp.camunda7.quarkus.runtime.VanillaBpCamunda7Properties;
 import io.vanillabp.cockpit.camunda7.Camunda7CockpitCustomizer;
 import io.vanillabp.cockpit.extension.spi.EventTransaction;
+import io.vanillabp.cockpit.extension.test.support.CockpitServer;
 import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 import jakarta.inject.Inject;
 import jakarta.transaction.UserTransaction;
@@ -54,6 +55,10 @@ public class Camunda7OwnDataSourceTest {
               .addClass(TestAggregate.class)
               .addClass(TestAggregatePersistence.class)
               .addClass(TestWorkflowService.class)
+              // this test class is initialized twice, once while the application is built
+              // and again inside the class loader of the running application. The copy
+              // inside that application needs the server class as well, or the assertions
+              // run against a class nobody loaded there
               .addClass(CockpitServer.class))
       .overrideRuntimeConfigKey(
           "vanillabp.cockpit.rest.base-url", CockpitServer.baseUrl());

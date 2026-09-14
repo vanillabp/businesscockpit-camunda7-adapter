@@ -32,6 +32,7 @@ import io.vanillabp.camunda7.Camunda7Adapter;
 import io.vanillabp.camunda7.springboot.engine.Camunda7EngineHolder;
 import io.vanillabp.cockpit.camunda7.Camunda7UserTaskListener;
 import io.vanillabp.cockpit.extension.spi.BusinessCockpitBpmsBridge;
+import io.vanillabp.cockpit.extension.test.support.CockpitServer;
 import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 
 /**

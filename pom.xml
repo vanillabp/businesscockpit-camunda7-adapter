@@ -120,6 +120,14 @@
         <version>${business-cockpit.version}</version>
       </dependency>
       <dependency>
+        <!-- the cockpit server every extension repository lets its tests report to. It is
+          published like the rest of extensions-commons, because a test classpath cannot read
+          another repository's test classes -->
+        <groupId>io.vanillabp.businesscockpit</groupId>
+        <artifactId>extensions-commons-test-support</artifactId>
+        <version>${business-cockpit.version}</version>
+      </dependency>
+      <dependency>
         <groupId>io.vanillabp.businesscockpit</groupId>
         <artifactId>spi-for-java</artifactId>
         <version>${business-cockpit.version}</version>
