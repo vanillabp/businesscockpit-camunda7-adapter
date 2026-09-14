@@ -3,6 +3,7 @@ package io.vanillabp.cockpit.camunda7;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -19,11 +20,13 @@ import org.camunda.bpm.engine.task.IdentityLinkType;
 import org.camunda.bpm.engine.task.Task;
 
 import io.vanillabp.camunda7.Camunda7Adapter;
+import io.vanillabp.camunda7.api.Camunda7MultiInstances;
 import io.vanillabp.cockpit.extension.spi.BusinessCockpitBpmsBridge;
 import io.vanillabp.cockpit.extension.spi.UserTaskDetailsPrefill;
 import io.vanillabp.cockpit.extension.spi.UserTaskReference;
 import io.vanillabp.cockpit.extension.spi.WorkflowDetailsPrefill;
 import io.vanillabp.cockpit.extension.spi.WorkflowReference;
+import io.vanillabp.integration.extension.spi.handler.HandlerMultiInstance;
 
 /**
  * What one configured Camunda 7 engine can be asked about a task or a workflow.
@@ -272,7 +275,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         .dueDate(atOffset(task.getDueDate()))
         .followUpDate(atOffset(task.getFollowUpDate()))
         .variables(variablesOf(task.getId()))
-        .multiInstances(Camunda7MultiInstances.of(engine, task.getExecutionId()))
+        .multiInstances(multiInstancesOf(task.getExecutionId()))
         .build();
 
   }
@@ -508,6 +511,41 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
     return (formKey == null) || formKey.isBlank()
         ? bpmnTaskId
         : formKey;
+
+  }
+
+  /**
+   * The multi-instance scopes a user task runs in, as a details provider's
+   * <code>&#64;MultiInstanceElement</code>, <code>&#64;MultiInstanceIndex</code> and
+   * <code>&#64;MultiInstanceTotal</code> parameters are bound from.
+   * <p>
+   * The walk itself belongs to the Camunda 7 adapter: it reads the execution tree, which is
+   * the engine knowledge a Camunda upgrade is most likely to invalidate, and the adapter does
+   * it for its own task deliveries anyway.
+   * <p>
+   * What is left here is a copy from one record into another. The adapter answers what a BPMS
+   * reports about a task, the platform's handler layer takes what an invocation of application
+   * code runs in, and the two are separate contracts although they carry the same three
+   * values. Copying them is done in this one place, and the order the adapter promises -
+   * outermost first - is what the map keeps.
+   *
+   * @param executionId The execution the user task runs in
+   * @return The scopes, keyed by BPMN element id
+   */
+  private Map<String, HandlerMultiInstance> multiInstancesOf(
+      final String executionId) {
+
+    final var outermostFirst = new LinkedHashMap<String, HandlerMultiInstance>();
+    Camunda7MultiInstances
+        .of(engine, executionId)
+        .forEach(
+            (
+                elementId,
+                scope) -> outermostFirst
+                    .put(
+                        elementId,
+                        new HandlerMultiInstance(scope.element(), scope.index(), scope.total())));
+    return outermostFirst;
 
   }
 

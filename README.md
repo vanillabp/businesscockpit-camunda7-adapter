@@ -53,8 +53,6 @@ What the core does, class by class:
   one outbox entry.
 - `Camunda7CockpitBridge` answers everything the cockpit reads back about a task or a workflow,
   which happens when the entry is dispatched and the engine's transaction is long committed.
-- `Camunda7MultiInstances` is the one thing the engine's query API cannot answer: the
-  multi-instance context of a user task, walked out of the execution tree.
 - `Camunda7Scope` and `Camunda7EngineSettings` are how the extension asks the adapter what an
   engine calls things and how the platform modules say whether the engine's work runs in the
   application's transaction, rather than building a prefix, a tenant or an answer of its own.
