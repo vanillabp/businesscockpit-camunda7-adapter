@@ -29,4 +29,32 @@
       <bpmn:incoming>MI_ToEnd</bpmn:incoming>
     </bpmn:endEvent>
   </bpmn:process>
+  <bpmn:process id="NoFormKeyProcess" isExecutable="true">
+    <bpmn:startEvent id="NFK_Start">
+      <bpmn:outgoing>NFK_ToApprove</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:sequenceFlow id="NFK_ToApprove" sourceRef="NFK_Start" targetRef="NFK_Approve" />
+    <bpmn:userTask id="NFK_Approve" name="A task the modeller gave no form">
+      <bpmn:incoming>NFK_ToApprove</bpmn:incoming>
+      <bpmn:outgoing>NFK_ToEnd</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="NFK_ToEnd" sourceRef="NFK_Approve" targetRef="NFK_End" />
+    <bpmn:endEvent id="NFK_End">
+      <bpmn:incoming>NFK_ToEnd</bpmn:incoming>
+    </bpmn:endEvent>
+  </bpmn:process>
+  <bpmn:process id="ExpressionFormKeyProcess" isExecutable="true">
+    <bpmn:startEvent id="EFK_Start">
+      <bpmn:outgoing>EFK_ToApprove</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:sequenceFlow id="EFK_ToApprove" sourceRef="EFK_Start" targetRef="EFK_Approve" />
+    <bpmn:userTask id="EFK_Approve" name="Approve with the form the case asks for" camunda:formKey="${formName}">
+      <bpmn:incoming>EFK_ToApprove</bpmn:incoming>
+      <bpmn:outgoing>EFK_ToEnd</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="EFK_ToEnd" sourceRef="EFK_Approve" targetRef="EFK_End" />
+    <bpmn:endEvent id="EFK_End">
+      <bpmn:incoming>EFK_ToEnd</bpmn:incoming>
+    </bpmn:endEvent>
+  </bpmn:process>
 </bpmn:definitions>

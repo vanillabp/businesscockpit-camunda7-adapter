@@ -22,6 +22,7 @@ import org.camunda.bpm.engine.task.Task;
 import io.vanillabp.camunda7.Camunda7Adapter;
 import io.vanillabp.camunda7.api.Camunda7Executions;
 import io.vanillabp.camunda7.api.Camunda7MultiInstances;
+import io.vanillabp.camunda7.api.Camunda7TaskDefinitions;
 import io.vanillabp.cockpit.extension.spi.BusinessCockpitBpmsBridge;
 import io.vanillabp.cockpit.extension.spi.UserTaskDetailsPrefill;
 import io.vanillabp.cockpit.extension.spi.UserTaskReference;
@@ -96,7 +97,6 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
           .getTaskService()
           .createTaskQuery()
           .taskId(userTask.userTaskId())
-          .initializeFormKeys()
           .singleResult();
       if (task != null) {
         return Optional.of(prefillOf(task, userTask.bpmnProcessId()));
@@ -172,8 +172,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
     var query = engine
         .getTaskService()
         .createTaskQuery()
-        .processInstanceBusinessKey(workflowAggregateId)
-        .initializeFormKeys();
+        .processInstanceBusinessKey(workflowAggregateId);
     final var tenantId = scope.tenantIdOf(workflowModuleId);
     query = tenantId != null
         ? query.tenantIdIn(tenantId)
@@ -206,8 +205,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         .getTaskService()
         .createTaskQuery()
         .taskId(userTaskId)
-        .processInstanceBusinessKey(workflowAggregateId)
-        .initializeFormKeys();
+        .processInstanceBusinessKey(workflowAggregateId);
     final var tenantId = scope.tenantIdOf(workflowModuleId);
     query = tenantId != null
         ? query.tenantIdIn(tenantId)
@@ -250,8 +248,8 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
                     .bpmnProcessId(), workflowAggregateId, Camunda7Executions
                         .rootProcessInstanceIdOf(
                             engine.getHistoryService(), task
-                                .getProcessInstanceId()), task.getId(), taskDefinitionOf(
-                                    task.getFormKey(), task.getTaskDefinitionKey()), task.getTaskDefinitionKey()));
+                                .getProcessInstanceId()), task
+                                    .getId(), taskDefinitionOf(task), task.getTaskDefinitionKey()));
 
   }
 
@@ -488,13 +486,28 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
 
   }
 
-  private static String taskDefinitionOf(
-      final String formKey,
-      final String bpmnTaskId) {
+  /**
+   * What the cockpit calls a running task: the form key the modeller wrote, and the element id
+   * where the model carries none.
+   * <p>
+   * The form key is read off the deployed process definition rather than off the task. A task
+   * answers the form key its engine COMPUTED, and a form key which is an expression computes
+   * another string per workflow instance - one task would then reach the cockpit under as many
+   * identities as it has instances, and none of them would be the identity its listener
+   * reported while the model was parsed. Reading the definition is also why no query here asks
+   * the engine to evaluate form keys any more.
+   *
+   * @param task The task the engine answered with
+   * @return What a details provider is matched by and what the cockpit shows a form for
+   */
+  private String taskDefinitionOf(
+      final Task task) {
 
-    return (formKey == null) || formKey.isBlank()
-        ? bpmnTaskId
-        : formKey;
+    return Camunda7TaskDefinitions
+        .of(
+            Camunda7TaskDefinitions
+                .formKeyOf(engine, task.getProcessDefinitionId(), task.getTaskDefinitionKey()),
+            task.getTaskDefinitionKey());
 
   }
 
