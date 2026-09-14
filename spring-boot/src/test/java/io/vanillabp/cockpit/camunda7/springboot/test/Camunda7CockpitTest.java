@@ -638,6 +638,40 @@ public class Camunda7CockpitTest {
   }
 
   @Test
+  @DisplayName("A workflow and its user task carry the version Camunda counted for the deployed process")
+  public void theCountedVersionIsWhatIsReported() {
+
+    final var aggregate = aStartedWorkflow("Vera");
+    final var userTaskId = userTaskIdOf(aggregate);
+    final var countedByCamunda = String
+        .valueOf(
+            engine
+                .getRepositoryService()
+                .createProcessDefinitionQuery()
+                .processDefinitionKey(TestWorkflowService.BPMN_PROCESS_ID)
+                .latestVersion()
+                .singleResult()
+                .getVersion());
+
+    final var workflows = bridge()
+        .workflowsOfAggregate(
+            MODULE_ID, TestWorkflowService.BPMN_PROCESS_ID, String.valueOf(aggregate.getId()));
+    assertEquals(1, workflows.size(), workflows.toString());
+    assertEquals(
+        countedByCamunda,
+        bridge().prefilledWorkflowDetails(workflows.getFirst()).orElseThrow().bpmnProcessVersion(),
+        "the workflow carries a version Camunda did not count");
+    assertEquals(
+        countedByCamunda,
+        bridge()
+            .prefilledUserTaskDetails(referenceOf(aggregate, userTaskId))
+            .orElseThrow()
+            .bpmnProcessVersion(),
+        "the user task carries a version Camunda did not count");
+
+  }
+
+  @Test
   @DisplayName("The workflows of an aggregate include the one which already ended")
   public void theWorkflowsOfAnAggregateIncludeTheFinishedOne() {
 
