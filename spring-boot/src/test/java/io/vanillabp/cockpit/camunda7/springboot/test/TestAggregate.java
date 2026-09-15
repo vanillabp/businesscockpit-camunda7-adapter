@@ -13,15 +13,14 @@ import jakarta.persistence.Version;
  * The business case of the test: what the workflow is about and what a details provider
  * changes.
  * <p>
- * It carries a version attribute, and that is what an application with a writing details
- * provider is meant to do. The provider runs while a report is dispatched, in the transaction
- * of that dispatch, so it reads this case long before it writes it back. An application
- * changing the same case in that window would otherwise lose its change without a word: the
- * dispatch writes every field it holds, the older reading among them. With the version
- * attribute the later of the two writers reads a conflict instead. The application answers it by
- * repeating its transaction. The dispatch answers it by leaving its outbox entry unfinished, so
- * the report goes out again from a fresh reading of the case. When that happens is not promised to
- * anybody.
+  * It carries a version attribute, and that is what an application with a writing details
+  * provider is meant to do. The provider runs while a report is dispatched, in the transaction of
+  * that dispatch, so it reads this case long before it writes it back. An application changing
+  * the same case in that window would otherwise lose its change without a word, because the
+  * dispatch writes every field it holds, the older reading among them. With the version attribute
+  * the later of the two writers reads a conflict instead. The application answers it by repeating
+  * its transaction. The dispatch answers it by leaving its outbox entry unfinished, so the report
+  * goes out again from a fresh reading of the case. When that happens is not promised to anybody.
  */
 @Entity
 public class TestAggregate {

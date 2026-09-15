@@ -203,7 +203,7 @@ public class Camunda7UsePrefixTest {
     assertEquals(userTaskId, ownTasks.getFirst().userTaskId());
 
     // no tenant separates the workflow modules in this mode, so the engine answers this query
-    // with the very same task - and a module which did not deploy that process must not get it
+    // with the very same task, and a module which did not deploy that process must not get it
     assertEquals(
         List.of(),
         bridge()

@@ -22,16 +22,16 @@ import io.vanillabp.cockpit.extension.spi.WorkflowReference;
 /**
  * What one configured Camunda 7 engine reports to the Business Cockpit.
  * <p>
- * Both of the engine's hooks - the task listeners of a user task and the handler of the
- * process-instance history events - end here, and both do the same little: turn what the
- * engine says into the identifiers the cockpit addresses a task or a workflow by, and write
- * one outbox entry. Nothing is read beyond those identifiers and nothing is sent, because the
- * engine is in the middle of a transaction and a listener which talks to a server holds that
- * transaction open for as long as the server takes.
+  * The engine has two hooks here, the task listeners of a user task and the handler of the
+  * process-instance history events. Both end in this class, and both do the same little: turn
+  * what the engine says into the identifiers the cockpit addresses a task or a workflow by, and
+  * write one outbox entry. Nothing is read beyond those identifiers and nothing is sent. The
+  * engine is in the middle of a transaction, and a listener which talks to a server holds that
+  * transaction open for as long as the server takes.
  * <p>
- * The entry is written in the transaction the engine's work happens in, so it becomes visible
- * if and only if that work was committed. An engine which commits on its own has no such
- * transaction to share, and the entry then gets one of its own.
+  * The entry is written in the transaction the engine's work happens in, so it becomes visible if
+  * and only if that work was committed. An engine which commits on its own has no such
+  * transaction to share. The entry then gets one of its own.
  */
 public class Camunda7CockpitEvents {
 

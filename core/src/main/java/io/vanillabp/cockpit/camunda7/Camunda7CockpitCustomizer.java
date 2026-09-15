@@ -24,16 +24,16 @@ import io.vanillabp.integration.adapter.spi.NameClashAvoidanceSupport;
 /**
  * What the Business Cockpit adds to every Camunda 7 engine VanillaBP builds.
  * <p>
- * Two things, and both of them the engine's own hooks rather than anything written into a
- * model: a parse listener attaching the cockpit's task listeners to each user task, and a
- * handler for the process-instance history events. The parse listener is contributed as an
- * <b>after</b> listener, so the tasks it sees are the tasks VanillaBP has already wired and
- * the cockpit's listeners run behind VanillaBP's own - which is the order a details provider
- * needs, because it is invoked on an aggregate a completed task may just have changed.
+  * Two things, and both of them the engine's own hooks rather than anything written into a model:
+  * a parse listener attaching the cockpit's task listeners to each user task, and a handler for
+  * the process-instance history events. The parse listener is contributed as an <b>after</b>
+  * listener. The tasks it sees are therefore the tasks VanillaBP has already wired, and the
+  * cockpit's listeners run behind VanillaBP's own. That is the order a details provider needs,
+  * because it is called on an aggregate a completed task may just have changed.
  * <p>
- * One customizer serves every configured Camunda 7 adapter id; VanillaBP asks it once per
- * engine and hands over the id, and what the extension reports carries that id, so two engines
- * of a migration stay apart all the way to the cockpit server.
+  * One customizer serves every configured Camunda 7 adapter id. VanillaBP asks it once per engine
+  * and hands over the id, and what the extension reports carries that id. Two engines of a
+  * migration therefore stay apart all the way to the cockpit server.
  */
 public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
 
@@ -42,11 +42,11 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
    * about the process instance, and a user task the engine has already finished with is read
    * back from what it wrote about the task instance.
    * <p>
-   * Every one of Camunda's own levels from <code>activity</code> upwards produces all of them;
-   * what <code>audit</code> adds on top is variable and form-property history, which the
-   * cockpit does not read. The identity-link log naming the candidates of a finished task is
-   * written at <code>full</code> alone, and the bridge treats it as optional, so it is not
-   * among the events an engine is held to here.
+    * Every one of Camunda's own levels from <code>activity</code> upwards produces all of them.
+    * What <code>audit</code> adds on top is variable and form-property history, which the cockpit
+    * does not read. The identity-link log naming the candidates of a finished task is written at
+    * <code>full</code> alone. The bridge treats it as optional, so it is not among the events an
+    * engine is held to here.
    */
   private static final Set<HistoryEventTypes> HISTORY_EVENTS_THE_COCKPIT_READS = Set
       .of(
@@ -110,12 +110,11 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
   }
 
   /**
-   * The engine is about to be built, and the one thing this extension has to know about it -
-   * how much history it will keep - is not settled yet: the <code>preInit</code> of every
-   * engine plugin of the application is still to come and may set another level, and
-   * <code>auto</code> names no level at all until the engine has read the one its database was
-   * created with. So nothing is decided here; a plugin is added which is asked once both have
-   * happened.
+    * The engine is about to be built, and the one thing this extension has to know about it is
+    * not settled yet: how much history it will keep. The <code>preInit</code> of every engine
+    * plugin of the application is still to come and may set another level, and <code>auto</code>
+    * names no level at all until the engine has read the one its database was created with. So
+    * nothing is decided here. A plugin is added instead, and it is asked once both have happened.
    */
   @Override
   public void customize(
@@ -132,10 +131,10 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
    * Asks the engine's history level whether it produces the events the cockpit reads and ends
    * the boot where it does not - see decision 8 in the repository's DECISIONS.md.
    * <p>
-   * A plugin rather than a line in {@link Camunda7CockpitCustomizer#customize}, because the
-   * level read while an engine is being customized is not the level that engine runs with: an
-   * application sets it in the <code>preInit</code> of a plugin of its own, and every one of
-   * those has run by the time the engine calls <code>postInit</code>.
+    * A plugin rather than a line in {@link Camunda7CockpitCustomizer#customize}, because the
+    * level read while an engine is being customized is not the level that engine runs with. An
+    * application sets it in the <code>preInit</code> of a plugin of its own, and every one of
+    * those has run by the time the engine calls <code>postInit</code>.
    */
   private static final class HistoryLevelCheck implements ProcessEnginePlugin {
 
@@ -155,8 +154,8 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
     }
 
     /**
-     * Every plugin has had its say, so a level spelled out by name is settled - and settled
-     * before the engine has written anything, which is the earliest this can end a boot.
+      * Every plugin has had its say, so a level spelled out by name is settled. It is settled
+      * before the engine has written anything, which is the earliest this can end a boot.
      */
     @Override
     public void postInit(
@@ -188,11 +187,11 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
    * none of it would leave the application running and the cockpit empty without anything
    * saying why.
    * <p>
-   * The level is asked rather than compared against a list of names. A level is an object an
-   * application may bring along itself, and it answers per event type; asked with no entity it
-   * says whether it writes such an event at all, which is exactly the question here. Comparing
-   * names would judge a level nobody but the application knows, and it would pass a level
-   * called <code>activity</code> which somebody replaced with one writing less.
+    * The level is asked rather than compared against a list of names. A level is an object an
+    * application may bring along itself, and it answers per event type. Asked with no entity it
+    * says whether it writes such an event at all, which is exactly the question here. Comparing
+    * names would judge a level nobody but the application knows, and it would pass a level called
+    * <code>activity</code> which somebody replaced with one writing less.
    *
    * @param adapterId The configured adapter id, for the message
    * @param level What the engine settled on, or <code>null</code> while <code>auto</code> is
@@ -216,15 +215,16 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
     }
     throw new IllegalStateException(
         """
-            The Business Cockpit observes the Camunda 7 engine of the adapter '%s', but that \
-            engine is configured with the history level '%s', which does not write these history \
-            events: %s. The cockpit reads a workflow's lifecycle from what the engine \
-            wrote about the process instance and a user task it has already finished with from \
-            what it wrote about the task instance, so workflows and tasks would be missing from \
-            the cockpit. The lowest of Camunda's levels writing all of them is '%s', and the \
-            engine's own default is '%s' - so this engine was given its level by an engine \
-            plugin or by a Camunda7EngineCustomizer of this application. Configure it with '%s' \
-            or above, or take the Business Cockpit extension out of the application."""
+            The Business Cockpit observes the Camunda 7 engine of the adapter '%s'. That engine \
+            is configured with the history level '%s', and that level does not write these \
+            history events: %s. The cockpit reads a workflow's lifecycle from what the engine \
+            wrote about the process instance. It reads a user task the engine has already \
+            finished with from what it wrote about the task instance. Workflows and tasks would \
+            therefore be missing from the cockpit. The lowest of Camunda's levels writing all of \
+            them is '%s', and the engine's own default is '%s', so this engine was given its \
+            level by an engine plugin or by a Camunda7EngineCustomizer of this application. \
+            Configure it with '%s' or above, or take the Business Cockpit extension out of the \
+            application."""
             .formatted(
                 adapterId, level.getName(), String.join(", ", missing),
                 ProcessEngineConfiguration.HISTORY_ACTIVITY,
@@ -313,14 +313,14 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
   }
 
   /**
-   * Where the engine's work happens inside the transaction the caller is in, the outbox entry
-   * belongs in that one: the cockpit then hears about a task if and only if the workflow which
-   * created it was committed. Where it does not, there is no such transaction to join and the
-   * entry gets one of its own.
+    * Where the engine's work happens inside the transaction the caller is in, the outbox entry
+    * belongs in that one. The cockpit then hears about a task if and only if the workflow which
+    * created it was committed. Where it does not, there is no such transaction to join, and the
+    * entry gets one of its own.
    * <p>
-   * Which of the two an engine is doing is the adapter's answer. It is read off the engine the
-   * adapter built rather than off a property, and an extension asking it itself would be a
-   * second reading of an engine somebody else assembled.
+    * Which of the two an engine is doing is the adapter's answer. It is read off the engine the
+    * adapter built rather than off a property. An extension answering it itself would be a second
+    * reading of an engine somebody else assembled.
    */
   private EventTransaction transactionOf(
       final String adapterId) {

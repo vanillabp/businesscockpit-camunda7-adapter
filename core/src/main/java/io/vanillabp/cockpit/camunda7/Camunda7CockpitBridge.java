@@ -34,16 +34,15 @@ import io.vanillabp.integration.extension.spi.handler.HandlerMultiInstance;
 /**
  * What one configured Camunda 7 engine can be asked about a task or a workflow.
  * <p>
- * Everything here runs long after the event which caused the question: an outbox entry is
- * dispatched once the transaction the engine reported in was committed, and the three
- * <code>…OfAggregate</code> methods answer an application which just changed its aggregate. So
- * the state read here is the current one, and a repeated report tells the cockpit what is true
- * now rather than what was true when the entry was written.
+  * Everything here runs long after the event which caused the question. An outbox entry is
+  * dispatched once the transaction the engine reported in was committed, and the three
+  * <code>…OfAggregate</code> methods answer an application which just changed its aggregate. So
+  * the state read here is the current one. A repeated report tells the cockpit what is true now,
+  * not what was true when the entry was written.
  * <p>
- * A task the engine no longer holds is looked up in history instead. That is not an edge case:
- * a task somebody completed within a second of its creation is normal, and reporting its
- * creation from history is better than losing the task from the cockpit's list of what
- * happened.
+  * A task the engine no longer holds is looked up in history instead. That is not an edge case. A
+  * task somebody completed within a second of its creation is normal, and reporting its creation
+  * from history is better than losing the task from the cockpit's list of what happened.
  */
 public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
 
@@ -226,10 +225,10 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
   }
 
   /**
-   * A running task as the cockpit addresses it. Its BPMN process has to be one the asking
-   * workflow module deployed: under <code>none</code> and under <code>use-prefix</code> no
-   * tenant separates the modules of an application, so a business key which two of them use
-   * would otherwise answer one module's question with another module's task.
+    * A running task as the cockpit addresses it. Its BPMN process has to be one the asking
+    * workflow module deployed. Under <code>none</code> and under <code>use-prefix</code> no
+    * tenant separates the modules of an application. A business key which two of them use would
+    * otherwise answer one module's question with another module's task.
    *
    * @param task The task the engine answered with
    * @param workflowModuleId The workflow module which was asked about
@@ -288,13 +287,13 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
   }
 
   /**
-   * A task the engine has finished with. History records what the task looked like and, where
-   * the engine keeps an identity-link log, who its candidates were; the variables it saw are
-   * not read, and a details provider of such a task therefore sees none.
+    * A task the engine has finished with. History records what the task looked like, and, where
+    * the engine keeps an identity-link log, who its candidates were. The variables it saw are not
+    * read, so a details provider of such a task sees none.
    * <p>
-   * The business case the task belongs to is read off the process instance rather than off the
-   * task, although the task records it too: the instance is in hand here anyway, and taking it
-   * from one place means one rule about what a root is.
+    * The business case the task belongs to is read off the process instance rather than off the
+    * task, although the task records it too. The instance is in hand here anyway, and taking it
+    * from one place means one rule about what a root is.
    */
   private UserTaskDetailsPrefill prefillOf(
       final HistoricTaskInstance task,
@@ -325,10 +324,10 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
   /**
    * Everything a prefill reads, in one engine command.
    * <p>
-   * A task, its process instance, its identity links, its variables and its execution tree are
-   * five questions, and each of them opens a command of its own when it is asked through the
-   * engine's services. The engine reuses a command context which is already open, so wrapping
-   * them makes the five share one session and one transaction instead of taking one apiece.
+    * A task, its process instance, its identity links, its variables and its execution tree are
+    * five questions. Each of them opens a command of its own when it is asked through the
+    * engine's services. The engine reuses a command context which is already open, so wrapping
+    * them makes the five share one session and one transaction instead of taking one apiece.
    *
    * @param reads What is to be read while that command is open
    * @return Whatever those reads produced
@@ -343,10 +342,10 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
   }
 
   /**
-   * Every variable the task can see, which is what a <code>&#64;TaskParam</code> parameter of a
-   * details provider is bound from. A variable somebody set to <code>null</code> is handed over
-   * as it is: the cockpit's neutral half binds the parameter to what the engine says, and a
-   * variable dropped here would be indistinguishable from one nobody ever set.
+    * Every variable the task can see, which is what a <code>&#64;TaskParam</code> parameter of a
+    * details provider is bound from. A variable somebody set to <code>null</code> is handed over
+    * as it is. The cockpit's neutral half binds the parameter to what the engine says, and a
+    * variable dropped here would look exactly like one nobody ever set.
    */
   private Map<String, Object> variablesOf(
       final String taskId) {
@@ -383,11 +382,11 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
   }
 
   /**
-   * Who was a candidate for a task the engine no longer holds. The engine keeps a log of the
-   * identity links it added and removed only at history level <code>full</code>; below that
-   * the log is empty and a finished task is reported without candidates rather than with wrong
-   * ones. Where there is a log, it is replayed in the order the engine wrote it, so a candidate
-   * somebody took away again is not reported as one.
+    * Who was a candidate for a task the engine no longer holds. The engine keeps a log of the
+    * identity links it added and removed only at history level <code>full</code>. Below that the
+    * log is empty, and a finished task is reported without candidates rather than with wrong
+    * ones. Where there is a log, it is replayed in the order the engine wrote it, so a candidate
+    * somebody took away again is not reported as one.
    */
   private Candidates historicCandidatesOf(
       final String taskId) {
@@ -460,15 +459,15 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
   /**
    * How Camunda counts the deployed process a workflow runs on, as an operator reads it.
    * <p>
-   * The adapter resolved that definition when it first met it and answers every later question
-   * about it from its own cache, so a cockpit asking once per task and once per rendered page
-   * pays the engine for none of them. Turning the version and its tag into one string is the
-   * platform's rule rather than this repository's, which is what makes one deployment read the
-   * same however the cockpit heard about it.
+    * The adapter resolved that definition when it first met it, and it answers every later
+    * question about it from its own cache. A cockpit asking once per task and once per rendered
+    * page therefore pays the engine for none of them. Turning the version and its tag into one
+    * string is the platform's rule rather than this repository's, which is what makes one
+    * deployment read the same however the cockpit heard about it.
    * <p>
-   * Nothing is reported while the adapter has no deployment service for this adapter id yet,
-   * and nothing for a definition the engine no longer holds. Every field of a prefill is
-   * optional, so a version nobody can name is left out rather than guessed at.
+    * Nothing is reported while the adapter has no deployment service for this adapter id yet, and
+    * nothing for a definition the engine no longer holds. Every field of a prefill is optional,
+    * so a version nobody can name is left out rather than guessed at.
    *
    * @param processDefinitionId The engine's process definition id
    * @return The version as an operator reads it, or <code>null</code>
@@ -505,12 +504,12 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
    * What the cockpit calls a running task: the form key the modeller wrote, and the element id
    * where the model carries none.
    * <p>
-   * The form key is read off the deployed process definition rather than off the task. A task
-   * answers the form key its engine COMPUTED, and a form key which is an expression computes
-   * another string per workflow instance - one task would then reach the cockpit under as many
-   * identities as it has instances, and none of them would be the identity its listener
-   * reported while the model was parsed. Reading the definition is also why no query here asks
-   * the engine to evaluate form keys any more.
+    * The form key is read off the deployed process definition rather than off the task. A task
+    * answers the form key its engine COMPUTED, and a form key which is an expression computes
+    * another string per workflow instance. One task would then reach the cockpit under as many
+    * identities as it has instances, and none of them would be the identity its listener reported
+    * while the model was parsed. Reading the definition is also why no query here asks the engine
+    * to evaluate form keys any more.
    *
    * @param task The task the engine answered with
    * @return What a details provider is matched by and what the cockpit shows a form for
@@ -531,15 +530,15 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
    * <code>&#64;MultiInstanceElement</code>, <code>&#64;MultiInstanceIndex</code> and
    * <code>&#64;MultiInstanceTotal</code> parameters are bound from.
    * <p>
-   * The walk itself belongs to the Camunda 7 adapter: it reads the execution tree, which is
-   * the engine knowledge a Camunda upgrade is most likely to invalidate, and the adapter does
-   * it for its own task deliveries anyway.
+    * The walk itself belongs to the Camunda 7 adapter. It reads the execution tree, which is the
+    * engine knowledge a Camunda upgrade is most likely to invalidate, and the adapter does it for
+    * its own task deliveries anyway.
    * <p>
-   * What is left here is a copy from one record into another. The adapter answers what a BPMS
-   * reports about a task, the platform's handler layer takes what an invocation of application
-   * code runs in, and the two are separate contracts although they carry the same three
-   * values. Copying them is done in this one place, and the order the adapter promises -
-   * outermost first - is what the map keeps.
+    * What is left here is a copy from one record into another. The adapter answers what a BPMS
+    * reports about a task, and the platform's handler layer takes what a call into application
+    * code runs in. They are separate contracts, although they carry the same three values.
+    * Copying them is done in this one place, and the map keeps the order the adapter promises,
+    * outermost first.
    *
    * @param executionId The execution the user task runs in
    * @return The scopes, keyed by BPMN element id

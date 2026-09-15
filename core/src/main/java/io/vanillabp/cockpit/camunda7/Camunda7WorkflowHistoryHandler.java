@@ -12,11 +12,11 @@ import io.vanillabp.cockpit.extension.spi.WorkflowEventKind;
 /**
  * How the Business Cockpit learns that a workflow started, ended or was cancelled.
  * <p>
- * The alternative would be an execution listener on every start and end event of every model,
- * which means rewriting models the modeller wrote and missing a workflow whose end nobody
- * modelled. History is the engine's own account of the same thing and needs no model change,
- * and it reports a cancellation - the case an end event never reaches - as an end with a
- * delete reason.
+  * The alternative would be an execution listener on every start and end event of every model.
+  * That means rewriting models the modeller wrote, and it misses a workflow whose end nobody
+  * modelled. History is the engine's own account of the same thing and needs no model change. It
+  * even reports a cancellation, the case an end event never reaches, as an end with a delete
+  * reason.
  * <p>
  * VanillaBP installs this handler NEXT TO the engine's own, so history is still written the
  * way it was. Every other kind of history event passes through untouched.

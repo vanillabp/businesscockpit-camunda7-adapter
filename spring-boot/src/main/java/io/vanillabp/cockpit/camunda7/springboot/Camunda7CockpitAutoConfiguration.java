@@ -21,10 +21,9 @@ import io.vanillabp.integration.extension.spi.ExtensionWiringService;
 /**
  * Registers the Camunda 7 half of the Business Cockpit extension on Spring Boot.
  * <p>
- * Nothing here decides anything: what the extension does with an engine is decided in the
- * platform-neutral module of this repository, and this class does what only Spring can do -
- * find the beans and put the extension's own where VanillaBP and the Camunda 7 adapter collect
- * them.
+  * Nothing here decides anything. What the extension does with an engine is decided in the
+  * platform-neutral module of this repository. This class does what only Spring can do: find the
+  * beans and put the extension's own where VanillaBP and the Camunda 7 adapter collect them.
  * <p>
  * It runs after VanillaBP's own auto-configuration, named rather than referenced, because an
  * extension does not compile against a platform integration.
@@ -62,9 +61,9 @@ public class Camunda7CockpitAutoConfiguration {
   /**
    * The listeners and the history handler of every Camunda 7 engine this application builds.
    * <p>
-   * The type is the concrete one rather than {@link Camunda7EngineCustomizer}, because the
-   * bridge of each adapter id takes its scope from here and the adapter collects customizers
-   * by their interface either way.
+    * The type is the concrete one rather than {@link Camunda7EngineCustomizer}. The bridge of
+    * each adapter id takes its scope from here, and the adapter collects customizers by their
+    * interface either way.
    *
    * @param processes The deployed processes
    * @param scoping VanillaBP's name-clash avoidance

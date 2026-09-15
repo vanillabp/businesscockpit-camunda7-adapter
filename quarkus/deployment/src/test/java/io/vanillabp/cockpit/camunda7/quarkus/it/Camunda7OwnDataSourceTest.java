@@ -24,25 +24,25 @@ import jakarta.transaction.UserTransaction;
  * A Quarkus application whose engine writes into a database of its own, and what a workflow it
  * rolled back leaves behind.
  * <p>
- * The engine writes to a resource the application's own persistence does not take part in. Two
- * data sources in one JTA transaction are still two commits, so the outbox entry reporting what
- * the engine did cannot ride the engine's commit however the container enlists them. The entry
- * therefore gets a transaction of its own, and that is the honest answer rather than a correct
- * one: entry and engine work commit separately, and the entry of a workflow the engine rolled
- * back is written and stays. What keeps such a workflow out of the cockpit is the dispatch. It
- * asks the engine about the workflow, the engine holds none, and an event about a workflow
- * nobody knows is dropped rather than sent.
+  * The engine writes to a resource the application's own persistence does not take part in. Two
+  * data sources in one JTA transaction are still two commits, so the outbox entry reporting what
+  * the engine did cannot ride the engine's commit, however the container enlists them. The entry
+  * therefore gets a transaction of its own. That is the honest answer rather than a correct one:
+  * entry and engine work commit separately, and the entry of a workflow the engine rolled back is
+  * written and stays. What keeps such a workflow out of the cockpit is the dispatch. It asks the
+  * engine about the workflow, the engine holds none, and an event about a workflow nobody knows
+  * is dropped rather than sent.
  * <p>
  * Whether an engine shares the caller's transaction is the Camunda 7 adapter's answer, read off
  * the engine that adapter built. This test pins what it answers for an engine with a data source
  * of its own, because that answer is what decides where the entry goes.
  * <p>
- * Neither data source of this application is configured as XA, and that is part of what this test
- * says. XA was the price of the old answer, which had the entry riding the engine's JTA
- * transaction: a second data source is enlisted there only as an XA resource, so without it the
- * entry failed while the engine worked. The entry has a transaction of its own now, so it enlists
- * nothing of the engine's and needs nothing declared. An application may still declare its data
- * sources as XA for reasons of its own; it changes nothing here.
+  * Neither data source of this application is configured as XA, and that is part of what this
+  * test says. XA was the price of the old answer, which had the entry riding the engine's JTA
+  * transaction. A second data source is enlisted there only as an XA resource, so without XA the
+  * entry failed while the engine worked. The entry has a transaction of its own now. It enlists
+  * nothing of the engine's and needs nothing declared. An application may still declare its data
+  * sources as XA for reasons of its own, and that changes nothing here.
  */
 @ExtendWith(SuppressOutputExtension.class)
 @SuppressOutputExtension.SuppressBackgroundOutput

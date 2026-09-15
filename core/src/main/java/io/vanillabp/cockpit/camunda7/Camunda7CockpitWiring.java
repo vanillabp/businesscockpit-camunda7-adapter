@@ -9,20 +9,20 @@ import io.vanillabp.integration.extension.spi.ExtensionWiringService;
 /**
  * The Camunda 7 half of the Business Cockpit in VanillaBP's deployment pipeline.
  * <p>
- * It declares the Camunda 7 adapter's model and processing-context types, so it takes part in
- * the deployment of a workflow module only where that module runs on Camunda 7. What it does
- * there is remember which BPMN processes exist, because that is what turns a process
- * definition key an engine reports back into the workflow module and the process id the
- * application wrote - see {@link Camunda7WorkflowProcesses}.
+  * It declares the Camunda 7 adapter's model and processing-context types, so it takes part in
+  * the deployment of a workflow module only where that module runs on Camunda 7. What it does
+  * there is remember which BPMN processes exist. That memory is what turns a process definition
+  * key an engine reports back into the workflow module and the process id the application wrote,
+  * see {@link Camunda7WorkflowProcesses}.
  * <p>
- * The model is not touched. On an embedded engine a listener is not written into the BPMN but
- * attached while the engine parses it, which is what the engine customizer of this extension
- * does; a model this extension rewrote would be a model the modeller no longer recognizes.
+  * The model is not touched. On an embedded engine a listener is not written into the BPMN but
+  * attached while the engine parses it, which is what the engine customizer of this extension
+  * does. A model this extension rewrote would be a model the modeller no longer recognizes.
  * <p>
- * The order is the Business Cockpit's own, and {@link BusinessCockpitWiringService#ORDER} says
- * what that number means. What this class reads is a model the Camunda 7 adapter has already
- * wired, and that comes from the pipeline calling the adapter before any extension rather
- * than from the number.
+  * The order is the Business Cockpit's own, and {@link BusinessCockpitWiringService#ORDER} says
+  * what that number means. What this class reads is a model the Camunda 7 adapter has already
+  * wired. That comes from the pipeline calling the adapter before any extension, not from the
+  * number.
  * <p>
  * Why the processes are remembered rather than derived from an engine's identifiers later is
  * decision 4 in the repository's DECISIONS.md.

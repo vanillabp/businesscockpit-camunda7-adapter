@@ -12,17 +12,17 @@ import io.vanillabp.camunda7.api.Camunda7TaskDefinitions;
 /**
  * Attaches the Business Cockpit's task listeners while the engine parses a user task.
  * <p>
- * The listeners are added as <b>built-in</b> ones, which is what keeps them out of reach of
- * <code>skipCustomListeners</code>: an operator who reassigns or deletes a task from the
- * Camunda web application asks the engine to skip the custom listeners of the model, and the
- * cockpit still has to learn that the task changed - a task list showing an assignee nobody
- * can correct is worse than no task list. It is also why all four events are taken rather than
- * only the two VanillaBP itself needs.
+  * The listeners are added as <b>built-in</b> ones, which keeps them out of reach of
+  * <code>skipCustomListeners</code>. An operator who reassigns or deletes a task from the Camunda
+  * web application asks the engine to skip the custom listeners of the model, and the cockpit
+  * still has to learn that the task changed. A task list showing an assignee nobody can correct
+  * is worse than no task list. It is also why all four events are taken rather than only the two
+  * VanillaBP itself needs.
  * <p>
- * The listener carries the element id and the form key it was parsed with, so a runtime event
- * needs neither a model lookup nor a registry of its own. What the cockpit calls the task is
- * the Camunda 7 adapter's own rule: the form key the modeller wrote, and the element id where
- * the model carries none, because a task without a form is still a task somebody has to see.
+  * The listener carries the element id and the form key it was parsed with, so a runtime event
+  * needs neither a model lookup nor a registry of its own. What the cockpit calls the task is the
+  * Camunda 7 adapter's own rule: the form key the modeller wrote, and the element id where the
+  * model carries none. A task without a form is still a task somebody has to see.
  * <p>
  * Why built-in and why after VanillaBP's own is decision 1 in the repository's DECISIONS.md, and
  * that every user task gets them whether or not the application enriches it is decision 2 in the

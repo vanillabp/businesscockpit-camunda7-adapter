@@ -18,12 +18,12 @@ import jakarta.inject.Inject;
  * An adapter id which is configured without a section of its own, named in
  * <code>prioritized-adapters</code> and nowhere else.
  * <p>
- * That is an everyday shape - the order of the engines is the only thing a migration has to say
- * about the second one - and it is the shape this half used to miss. Filtering the configured
- * adapter TYPES finds nothing for such an id, so the adapter built its engine and the cockpit
- * built no bridge, and every event of that engine was then reported to nobody. Which ids belong
- * to an adapter type is therefore VanillaBP's answer
- * ({@code MigrationAdapterProperties#adapterIdsOfType}) rather than this repository's.
+  * That is an everyday shape, because the order of the engines is the only thing a migration has
+  * to say about the second one. It is also the shape this half used to miss. Filtering the
+  * configured adapter TYPES finds nothing for such an id, so the adapter built its engine and the
+  * cockpit built no bridge, and every event of that engine was reported to nobody. Which ids
+  * belong to an adapter type is therefore VanillaBP's answer ({@code
+  * MigrationAdapterProperties#adapterIdsOfType}) rather than this repository's.
  */
 @ExtendWith(SuppressOutputExtension.class)
 @SuppressOutputExtension.SuppressBackgroundOutput

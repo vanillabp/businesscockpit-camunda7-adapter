@@ -9,10 +9,10 @@ import io.vanillabp.cockpit.camunda7.quarkus.Camunda7CockpitProducer;
 /**
  * What the Camunda 7 half of the Business Cockpit extension has to say at build time.
  * <p>
- * It produces no VanillaBP build item: an extension announces itself by the beans it produces,
- * unlike a BPMS adapter. The engine customizer among those beans is already on the unremovable
- * list of the Camunda 7 adapter's own deployment module, so nothing has to be said about it
- * here either.
+  * It produces no VanillaBP build item. Unlike a BPMS adapter, an extension announces itself by
+  * the beans it produces. The engine customizer among those beans is already on the unremovable
+  * list of the Camunda 7 adapter's own deployment module, so nothing has to be said about it here
+  * either.
  */
 class Camunda7CockpitProcessor {
 

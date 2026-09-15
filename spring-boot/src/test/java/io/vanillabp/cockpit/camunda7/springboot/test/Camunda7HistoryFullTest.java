@@ -31,10 +31,10 @@ import io.vanillabp.integration.test.utils.SuppressOutputExtension;
  * An application whose engine keeps every detail, which is the only level at which Camunda 7
  * logs the identity links a task had.
  * <p>
- * Who was allowed to work on a task is part of what the cockpit shows, and for a task the engine
- * has already finished with there is nothing left to ask but that log. It records an addition and
- * a removal as two entries rather than a state, so reading it means replaying it - and a
- * candidate somebody took away again must not come back through the replay.
+  * Who was allowed to work on a task is part of what the cockpit shows. For a task the engine has
+  * already finished with there is nothing left to ask but that log. It records an addition and a
+  * removal as two entries rather than a state, so reading it means replaying it, and a candidate
+  * somebody took away again must not come back through the replay.
  */
 @SpringBootTest(classes = {
     TestApplication.class, Camunda7HistoryFullTest.AnEngineKeepingEveryDetail.class
