@@ -37,9 +37,12 @@ import jakarta.transaction.UserTransaction;
  * the engine that adapter built. This test pins what it answers for an engine with a data source
  * of its own, because that answer is what decides where the entry goes.
  * <p>
- * Both data sources of this application are configured as XA, which is what an application with
- * an engine database of its own has to do on Quarkus: Agroal enlists a second data source only
- * as an XA resource, and without it writing the entry fails while the engine works.
+ * Neither data source of this application is configured as XA, and that is part of what this test
+ * says. XA was the price of the old answer, which had the entry riding the engine's JTA
+ * transaction: a second data source is enlisted there only as an XA resource, so without it the
+ * entry failed while the engine worked. The entry has a transaction of its own now, so it enlists
+ * nothing of the engine's and needs nothing declared. An application may still declare its data
+ * sources as XA for reasons of its own; it changes nothing here.
  */
 @ExtendWith(SuppressOutputExtension.class)
 @SuppressOutputExtension.SuppressBackgroundOutput
