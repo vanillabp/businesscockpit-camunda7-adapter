@@ -223,7 +223,7 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
             therefore be missing from the cockpit. The lowest of Camunda's levels writing all of \
             them is '%s', and the engine's own default is '%s', so this engine was given its \
             level by an engine plugin or by a Camunda7EngineCustomizer of this application. \
-            Configure it with '%s' or above, or take the Business Cockpit extension out of the \
+            Configure it with '%s' or above, or take the Business Cockpit out of the \
             application."""
             .formatted(
                 adapterId, level.getName(), String.join(", ", missing),
@@ -268,12 +268,12 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
                 .orElseThrow(
                     () -> new IllegalStateException(
                         """
-                            The Business Cockpit extension found nothing the Camunda 7 adapter \
+                            The Business Cockpit found nothing the Camunda 7 adapter \
                             knows about the engine of the adapter '%s', although VanillaBP counts \
                             that id among the Camunda 7 adapters of this application. The adapter \
                             publishes one entry per configured adapter id and published: %s. Add \
                             the artifact 'org.camunda.community.vanillabp:camunda7-adapter' of \
-                            your platform to your workflow module: this extension listens to the \
+                            your platform to your workflow module: the cockpit listens to the \
                             engines that adapter builds and has none of its own."""
                             .formatted(
                                 id,
