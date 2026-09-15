@@ -8,20 +8,20 @@ import io.vanillabp.integration.adapter.spi.NameClashAvoidanceSupport;
 /**
  * How one configured Camunda 7 engine names the things the extension asks it about.
  * <p>
- * Name-clash avoidance decides whether a workflow module's processes are deployed under a
- * tenant, under a prefixed process id or under neither, and every query the extension sends to
- * an engine has to spell the id the way that engine stores it. The rules are the adapter's, so
- * they are asked of the adapter rather than rebuilt here: a prefix which the extension
- * assembles itself is a prefix which drifts apart from the adapter's on the next change.
+  * Name-clash avoidance decides whether a workflow module's processes are deployed under a
+  * tenant, under a prefixed process id or under neither. Every query the extension sends to an
+  * engine has to spell the id the way that engine stores it. The rules are the adapter's, so they
+  * are asked of the adapter rather than rebuilt here. A prefix which the extension assembles
+  * itself drifts apart from the adapter's on the next change.
  * <p>
- * The tenant is the adapter's own answer, not a property read a second time. It may be
- * configured for a workflow module and for the adapter, and which of the two a module runs
- * under is what the adapter resolves when it deploys that module. Asking anywhere else means
- * querying a tenant the engine never stored.
+  * The tenant is the adapter's own answer, not a property read a second time. It may be
+  * configured for a workflow module and for the adapter. Which of the two a module runs under is
+  * what the adapter resolves when it deploys that module. Asking anywhere else means querying a
+  * tenant the engine never stored.
  * <p>
- * That answer is asked for when it is needed rather than when this scope is built. An engine is
- * built with what this extension contributes to it, so there is nothing to ask about the engine
- * while it is being built; by the time anything is reported or read back it exists.
+  * That answer is asked for when it is needed rather than when this scope is built. An engine is
+  * built with what this extension contributes to it, so there is nothing to ask about the engine
+  * while it is being built. By the time anything is reported or read back, the engine exists.
  */
 public final class Camunda7Scope {
 

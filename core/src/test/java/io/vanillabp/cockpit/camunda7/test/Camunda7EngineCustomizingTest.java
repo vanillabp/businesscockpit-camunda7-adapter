@@ -33,11 +33,11 @@ import io.vanillabp.integration.test.utils.SuppressOutputExtension;
  * What the extension contributes to an engine which is about to be built, and what it refuses to
  * be built with.
  * <p>
- * The refusal is the interesting half, and the reason these tests build a real engine instead of
- * asking a configuration double: an application sets the history level in an engine plugin, and a
- * plugin has its say long after this extension was asked to customize the configuration. Whether
- * the check ever fires is therefore a question about the order the engine runs its own hooks in,
- * which only the engine can answer.
+  * The refusal is the interesting half, and it is why these tests build a real engine instead of
+  * asking a configuration double. An application sets the history level in an engine plugin, and
+  * a plugin has its say long after this extension was asked to customize the configuration.
+  * Whether the check ever fires is therefore a question about the order the engine runs its own
+  * hooks in, and only the engine can answer it.
  */
 @ExtendWith(SuppressOutputExtension.class)
 public class Camunda7EngineCustomizingTest {
@@ -250,7 +250,7 @@ public class Camunda7EngineCustomizingTest {
 
     final var configuration = anEngineOf("cockpit-history-auto");
     // 'auto' names no level until the engine has looked into its database, which is after every
-    // plugin has run - a fresh database answers with the engine's default
+    // plugin has run: a fresh database answers with the engine's default
     configuration.setHistory("auto");
 
     final var engine = configuration.buildProcessEngine();

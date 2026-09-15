@@ -7,10 +7,10 @@
 This repository holds the [VanillaBP Business Cockpit](https://github.com/vanillabp/business-cockpit)
 integration for [Camunda 7](https://docs.camunda.org/), built as an extension of
 [VanillaBP](https://www.vanillabp.io) Version 2. The cockpit shows user tasks and business cases
-to business staff, and to do that it has to learn what happens inside the workflow engine. This
-adapter is the half that runs in the workflow application: it observes the user-task and workflow
-lifecycle in the embedded Camunda 7 engine, asks the application for the business details of what
-it saw, and hands the result to the cockpit server.
+to business staff, so it has to learn what happens inside the workflow engine. This adapter is the
+half which runs in the workflow application. It watches the user-task and workflow lifecycle in the
+embedded Camunda 7 engine, asks the application for the business details of what it saw, and hands
+the result to the cockpit server.
 
 ## Status
 
@@ -24,9 +24,9 @@ from the extension, so its history never carries the Version 1 shape.
 
 ## What is here
 
-The extension is split the way every VanillaBP adapter repository is split, and the artifacts keep
-the repository name as their prefix so that a jar of this repository is never mistaken for a jar of
-the VanillaBP Camunda 7 adapter it plugs into.
+The extension is split the way every VanillaBP adapter repository is split. The artifacts keep the
+repository name as their prefix, so a jar of this repository is never mistaken for a jar of the
+VanillaBP Camunda 7 adapter it plugs into.
 
 |         Module         |                       Artifact                        |                                   What is in it                                    |
 |------------------------|-------------------------------------------------------|------------------------------------------------------------------------------------|
@@ -40,10 +40,11 @@ What the core does, class by class:
 
 - `Camunda7CockpitWiring` takes part in VanillaBP's deployment pipeline for a workflow module which
   runs on Camunda 7, and remembers which BPMN processes were deployed.
-- `Camunda7WorkflowProcesses` is that memory, and the way back from the identifiers an engine
-  reports to the workflow module and the plain process id the application wrote.
-- `Camunda7CockpitCustomizer` is what the Camunda 7 adapter asks per configured adapter id: it
-  contributes the parse listener and the history event handler of that engine, and it ends the boot
+- `Camunda7WorkflowProcesses` is that memory. It is also the way back: an engine reports
+  identifiers of its own, and this class says which workflow module and which plain process id the
+  application meant by them.
+- `Camunda7CockpitCustomizer` is what the Camunda 7 adapter asks per configured adapter id. It
+  contributes the parse listener and the history event handler of that engine. It also ends the boot
   of an engine whose history level writes none of what the cockpit reads back.
 - `Camunda7UserTaskParseListener` attaches `Camunda7UserTaskListener` to every user task, as a
   built-in listener of all four task events.
@@ -51,12 +52,13 @@ What the core does, class by class:
   cockpit's workflow events.
 - `Camunda7CockpitEvents` is what both of them report through: it builds the identifiers and writes
   one outbox entry.
-- `Camunda7CockpitBridge` answers everything the cockpit reads back about a task or a workflow,
-  which happens when the entry is dispatched and the engine's transaction is long committed.
+- `Camunda7CockpitBridge` answers everything the cockpit reads back about a task or a workflow.
+  That happens when the entry is dispatched, and by then the engine's transaction is long
+  committed.
 - `Camunda7Scope` is how the extension asks what an engine calls things, rather than building a
-  prefix or a tenant of its own. The tenant a workflow module was deployed under and whether the
-  engine's work runs in the caller's transaction are the Camunda 7 adapter's own answers, which
-  the extension reads per configured adapter id.
+  prefix or a tenant of its own. Two of those answers are the Camunda 7 adapter's: the tenant a
+  workflow module was deployed under, and whether the engine's work runs in the caller's
+  transaction. The extension reads both per configured adapter id.
 
 The decisions these classes rest on are numbered in [`DECISIONS.md`](./DECISIONS.md), and what a
 user of this extension has to know is in the
@@ -68,18 +70,17 @@ This extension rewrites no model. On an embedded engine a listener is attached w
 parses a model rather than written into the file, so the BPMN in your repository and the BPMN the
 engine gets are the same.
 
-It has no persistence of its own either. Version 1 kept a table about the workflows it had seen;
-what the cockpit needs is read from the engine when it is needed, and what has to survive a crash
-is the outbox entry VanillaBP already provides. Which of an application's outbox stores that entry
-is written into is VanillaBP's answer rather than this half's: an event names a workflow module, a
-BPMN process and a serialized id, and the store the matching aggregate's transaction reaches is the
-one it lands in. An application whose aggregates live in two persistences therefore needs nothing
-extra here.
+It has no persistence of its own either. Version 1 kept a table about the workflows it had seen.
+What the cockpit needs is read from the engine when it is needed, and what has to survive a crash
+is the outbox entry VanillaBP already provides. Which outbox store that entry goes into is
+VanillaBP's answer rather than this half's. An event names a workflow module, a BPMN process and a
+serialized id, and the entry lands in the store the matching aggregate's transaction reaches. An
+application whose aggregates live in two persistences therefore needs nothing extra here.
 
-And it has no configuration key of its own. What this half has to know about an engine it asks
-the Camunda 7 adapter: the tenant a workflow module was deployed under, and whether the outbox
-entry can share the engine's transaction. Both are answers the adapter acts on itself, so the
-extension cannot disagree with the engine it listens to.
+And it has no configuration key of its own. What this half has to know about an engine it asks the
+Camunda 7 adapter: the tenant a workflow module was deployed under, and whether the outbox entry
+can share the engine's transaction. The adapter acts on both answers itself, so the extension
+cannot disagree with the engine it listens to.
 
 ## Building
 
@@ -103,13 +104,16 @@ Cockpit.
 ## What CI runs
 
 `build.yaml` builds and tests a pull request, in a group per pull request, so an open pull request
-never takes the waiting run of another one out. `deploy-to-github-packages.yaml` publishes the
-snapshot, and only for a push to `main`: the snapshot artifacts share their coordinates, so what
-the other repositories compile against has to be what `main` holds. It runs in a group of its own,
-one publish at a time, and a publish which is already running is never cancelled, because two runs
-publishing at the same time would overwrite each other. `release.yaml` is started by hand and
-publishes to Maven Central from a release branch. It deploys no snapshot, so it can run beside a
-publish.
+never takes the waiting run of another one out.
+
+`deploy-to-github-packages.yaml` publishes the snapshot, and only for a push to `main`. The
+snapshot artifacts share their coordinates, so what the other repositories compile against has to
+be what `main` holds. It runs in a group of its own, one publish at a time. A publish which is
+already running is never cancelled, because two runs publishing at the same time would overwrite
+each other.
+
+`release.yaml` is started by hand and publishes to Maven Central from a release branch. It deploys
+no snapshot, so it can run beside a publish.
 
 ## Noteworthy & Contributors
 

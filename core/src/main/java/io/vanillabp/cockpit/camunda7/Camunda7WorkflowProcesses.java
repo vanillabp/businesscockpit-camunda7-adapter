@@ -11,12 +11,12 @@ import java.util.concurrent.CopyOnWriteArraySet;
  * Which BPMN processes of which workflow modules this application deployed, and how to get
  * from an engine's own identifiers back to them.
  * <p>
- * An engine reports a task or a history event with the process definition key and the tenant
- * it stored, and both of those depend on the name-clash avoidance the module was deployed
- * with. The translation back is therefore not a string operation but a lookup: every process
- * VanillaBP wires is remembered here while the deployment pipeline runs, and an event of a
- * process which is not in here belongs to something else - another application on the same
- * database, or a process definition of an earlier release which is no longer part of this one.
+  * An engine reports a task or a history event with the process definition key and the tenant it
+  * stored. Both of those depend on the name-clash avoidance the module was deployed with. The
+  * translation back is therefore not a string operation but a lookup. Every process VanillaBP
+  * wires is remembered here while the deployment pipeline runs. An event of a process which is
+  * not in here belongs to something else: another application on the same database, or a process
+  * definition of an earlier release which is no longer part of this one.
  * <p>
  * The reverse map is built per adapter id and thrown away whenever a process is added, which
  * happens a handful of times while the application starts and never afterwards.
@@ -38,9 +38,9 @@ public class Camunda7WorkflowProcesses {
   }
 
   /**
-   * Joins the two halves of an engine identity. A process definition key is a BPMN process id
-   * and carries no blank, so the key is always what stands behind the last blank and no pair of
-   * halves can be read as another pair.
+    * Joins the two halves of an engine identity. A process definition key is a BPMN process id
+    * and carries no blank. The key is therefore always what stands behind the last blank, and no
+    * pair of halves can be read as another pair.
    */
   private static final String SEPARATOR = " ";
 

@@ -24,8 +24,8 @@ import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Singleton;
 
 /**
- * Registers the Camunda 7 half of the Business Cockpit extension on Quarkus - the twin of the
- * Spring Boot module's auto-configuration, doing the same things with CDI.
+  * Registers the Camunda 7 half of the Business Cockpit extension on Quarkus. It is the twin of
+  * the Spring Boot module's auto-configuration and does the same things with CDI.
  * <p>
  * The producers are <code>&#64;Singleton</code> rather than
  * <code>&#64;ApplicationScoped</code>: what they produce has no no-argument constructor and is
@@ -93,18 +93,18 @@ public class Camunda7CockpitProducer {
    * One bridge per configured Camunda 7 adapter id, because during a migration each engine
    * holds workflows of its own and the cockpit addresses a workflow by the engine holding it.
    * <p>
-   * They are produced as one list rather than as one bean each: how many there are is decided
-   * by the configuration, which a producer method cannot express. The cockpit's neutral half
-   * collects both shapes, the same way VanillaBP's own Quarkus integration collects the
-   * adapter deployment services of a BPMS adapter.
+    * They are produced as one list rather than as one bean each. How many there are is decided by
+    * the configuration, which a producer method cannot express. The cockpit's neutral half
+    * collects both shapes, the same way VanillaBP's own Quarkus integration collects the adapter
+    * deployment services of a BPMS adapter.
    * <p>
-   * WHICH adapter ids those are is {@code MigrationAdapterProperties#adapterIdsOfType}, the same
-   * answer the Spring Boot half reads through the platform's registrar support. Filtering the
-   * configured types is not that answer: an id named in <code>prioritized-adapters</code> needs
-   * no section of its own, and an application which configured nothing at all has the id the
-   * classpath derives - so a migration setup and a single-dependency application are exactly the
-   * two cases where an extension answering it itself registers no bridge while the adapter
-   * registers fine.
+    * WHICH adapter ids those are is {@code MigrationAdapterProperties#adapterIdsOfType}, the same
+    * answer the Spring Boot half reads through the platform's registrar support. Filtering the
+    * configured types is not that answer. An id named in <code>prioritized-adapters</code> needs
+    * no section of its own, and an application which configured nothing at all has the id the
+    * classpath derives. A migration setup and a single-dependency application are therefore
+    * exactly the two cases where an extension answering it itself registers no bridge while the
+    * adapter registers fine.
    *
    * @param properties VanillaBP's resolved configuration, which names the configured adapters
    * @param engines The engines the Camunda 7 adapter built

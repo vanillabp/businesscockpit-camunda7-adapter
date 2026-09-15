@@ -54,6 +54,61 @@ Adding an entry has the same rule. A decision earns a number when several places
 copying the explanation to each of them would rot; anything smaller is a comment where it belongs,
 and anything larger is documentation.
 
+## How we write
+
+Most people who read this repository read English as a second language, and so does the
+maintainer. Long sentences, rare words and stacked nouns slow them down. Write so that
+nobody has to read a sentence twice.
+
+Short main sentences, one thought each. One subordinate clause is enough. Active voice.
+The common word instead of the rare one: `use` instead of `leverage`, `about` instead of
+`regarding`, `so` instead of `consequently`, `has` instead of `possesses`. A technical term
+stays a technical term, but say what it means the first time it turns up, and write an
+abbreviation out once. If a sentence trips you up when you read it aloud, rewrite it.
+
+This holds for every English text here: the README files, `DECISIONS.md`, this file, the
+Javadoc and comments which explain something, and the texts of commits and pull requests.
+It holds for the [wiki](https://github.com/vanillabp/businesscockpit-camunda7-adapter/wiki)
+as well, because the wiki clone has no `AGENTS.md` of its own.
+
+Nothing a program reads is renamed for the sake of language. Class and method names,
+configuration keys, artifact coordinates and the headlines of decision log entries stay as
+they are, because code, tests and other repositories point at them.
+
+Before and after, from this repository:
+
+> The alternative would be execution listeners written into every model, which means rewriting
+> models their author wrote and missing every workflow whose end nobody modelled.
+
+became
+
+> The alternative would be execution listeners written into every model. That means rewriting
+> models their author wrote, and it misses every workflow whose end nobody modelled.
+
+This one:
+
+> Whether the application declares a `@UserTaskDetailsProvider` for that task decides only how
+> much the cockpit is told about it, never whether it is told at all.
+
+became
+
+> A `@UserTaskDetailsProvider` for that task decides how much the cockpit is told about it. It
+> never decides whether the cockpit is told at all.
+
+And this one:
+
+> Where an event the cockpit reads is missing, the boot ends with a message naming the engine's
+> level, the events it does not write, the lowest level which writes them and the fact that the
+> engine's own default already does - so an application which never touched the level will never
+> see it.
+
+became
+
+> Where an event the cockpit reads is missing, the boot ends. The message names the engine's
+> level, the events it does not write, the lowest level which writes them, and the fact that the
+> engine's own default already does. An application which never touched the level will therefore
+> never see it.
+
 ## Before you open a pull request
 
 A number your branch hands out can be taken by the time you open the pull request. Another branch

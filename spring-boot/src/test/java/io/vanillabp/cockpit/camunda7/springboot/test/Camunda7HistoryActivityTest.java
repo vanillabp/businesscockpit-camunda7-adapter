@@ -30,12 +30,12 @@ import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 /**
  * An application whose engine keeps the least history the cockpit can work with.
  * <p>
- * Camunda's <code>activity</code> writes what happened to a process instance and what happened to
- * a task, which is everything the cockpit reads; what the level above it adds is variable and
- * form-property history, and none of that is asked for here. So an application which lowered its
- * engine to it gets a cockpit which works, and this test walks the whole way to prove it: a
- * workflow starts, its task appears, both are reported, both are reported again when the task is
- * completed, and the finished task is still readable afterwards.
+  * Camunda's <code>activity</code> writes what happened to a process instance and what happened
+  * to a task, which is everything the cockpit reads. What the level above it adds is variable and
+  * form-property history, and none of that is asked for here. So an application which lowered its
+  * engine to it gets a cockpit which works. This test walks the whole way to prove it: a workflow
+  * starts, its task appears, both are reported, both are reported again when the task is
+  * completed, and the finished task is still readable afterwards.
  * <p>
  * What such an engine cannot answer is who was a candidate for a task it has finished with, since
  * the identity-link log belongs to <code>full</code>. That is asserted here as well, because it is
