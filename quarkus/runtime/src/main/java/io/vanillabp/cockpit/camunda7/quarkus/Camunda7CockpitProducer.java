@@ -126,9 +126,10 @@ public class Camunda7CockpitProducer {
         .stream()
         .<BusinessCockpitBpmsBridge>map(
             adapterId -> new Camunda7CockpitBridge(
-                customizer.scopeOf(adapterId), customizer.engineOf(adapterId), processes, engines
-                    .engineFor(adapterId)
-                    .getProcessEngine()))
+                customizer.scopeOf(adapterId), customizer.engineOf(adapterId), processes, customizer
+                    .eventBeingReportedOf(adapterId), engines
+                        .engineFor(adapterId)
+                        .getProcessEngine()))
         .toList();
 
   }

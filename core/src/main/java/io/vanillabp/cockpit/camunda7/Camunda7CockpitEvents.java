@@ -23,11 +23,15 @@ import io.vanillabp.cockpit.extension.spi.WorkflowReference;
  * What one configured Camunda 7 engine reports to the Business Cockpit.
  * <p>
   * The engine has two hooks here, the task listeners of a user task and the handler of the
-  * process-instance history events. Both end in this class, and both do the same little: turn
-  * what the engine says into the identifiers the cockpit addresses a task or a workflow by, and
-  * write one outbox entry. Nothing is read beyond those identifiers and nothing is sent. The
-  * engine is in the middle of a transaction, and a listener which talks to a server holds that
-  * transaction open for as long as the server takes.
+  * process-instance history events. Both end in this class, and both do the same: turn what the
+  * engine says into the identifiers the cockpit addresses a task or a workflow by, and hand the
+  * event over. The cockpit's neutral half then builds the whole report and writes one outbox
+  * entry. Nothing is sent from here. The engine is in the middle of a transaction, and a listener
+  * which talks to a server holds that transaction open for as long as the server takes.
+ * <p>
+  * The report is built out of the event rather than out of a later reading, so what the engine
+  * handed over is put into {@link Camunda7EventBeingReported} for as long as that takes.
+  * {@link Camunda7CockpitBridge} answers the cockpit's questions from there.
  * <p>
   * The version of the deployed process is one of those identifiers, and the cockpit picks the
   * details provider of a task or a workflow by it. The Camunda 7 adapter has it cached, so
@@ -45,6 +49,8 @@ public class Camunda7CockpitEvents {
 
   private final Camunda7WorkflowProcesses processes;
 
+  private final Camunda7EventBeingReported eventBeingReported;
+
   private final Supplier<BusinessCockpitEventPublisher> publisher;
 
   private final Supplier<EventTransaction> transaction;
@@ -52,6 +58,8 @@ public class Camunda7CockpitEvents {
   /**
    * @param scope The engine these events come from
    * @param processes The deployed processes, to translate the engine's identifiers back
+   * @param eventBeingReported Where the event is put for as long as its report is built, shared
+   *          with the bridge which answers out of it
    * @param publisher Where an event is handed to, asked for on the first event rather than up
    *          front: the engine is built while the application is still wiring itself together,
    *          and the extension is built from the engines
@@ -62,11 +70,13 @@ public class Camunda7CockpitEvents {
   public Camunda7CockpitEvents(
       final Camunda7Scope scope,
       final Camunda7WorkflowProcesses processes,
+      final Camunda7EventBeingReported eventBeingReported,
       final Supplier<BusinessCockpitEventPublisher> publisher,
       final Supplier<EventTransaction> transaction) {
 
     this.scope = scope;
     this.processes = processes;
+    this.eventBeingReported = eventBeingReported;
     this.publisher = publisher;
     this.transaction = transaction;
 
@@ -125,17 +135,22 @@ public class Camunda7CockpitEvents {
       return;
     }
 
-    publisher
-        .get()
-        .publishUserTaskEvent(
-            new UserTaskReference(
-                scope.adapterId(), process.get().workflowModuleId(), process.get()
-                    .bpmnProcessId(), scope
-                        .processVersionOf(
-                            definition.getId()), workflowAggregateId, Camunda7Executions
-                                .rootProcessInstanceIdOf(
-                                    execution), task.getId(), taskDefinition, bpmnTaskId),
-            kind, "%s#%s".formatted(task.getId(), task.getEventName()), OffsetDateTime.now(), transaction());
+    final var reference = new UserTaskReference(
+        scope.adapterId(), process.get().workflowModuleId(), process.get()
+            .bpmnProcessId(), scope
+                .processVersionOf(
+                    definition.getId()), workflowAggregateId, Camunda7Executions
+                        .rootProcessInstanceIdOf(
+                            execution), task.getId(), taskDefinition, bpmnTaskId);
+    eventBeingReported
+        .whileReporting(
+            task,
+            () -> publisher
+                .get()
+                .publishUserTaskEvent(
+                    reference, kind, "%s#%s".formatted(task.getId(), task.getEventName()), OffsetDateTime
+                        .now(),
+                    transaction()));
 
   }
 
@@ -168,16 +183,19 @@ public class Camunda7CockpitEvents {
       return;
     }
 
-    publisher
-        .get()
-        .publishWorkflowEvent(
-            new WorkflowReference(
-                scope.adapterId(), process.get().workflowModuleId(), process.get()
-                    .bpmnProcessId(), scope
-                        .processVersionOf(
-                            event.getProcessDefinitionId()), workflowAggregateId, event
-                                .getProcessInstanceId()),
-            kind, event.getId(), timestampOf(event, kind), transaction());
+    final var reference = new WorkflowReference(
+        scope.adapterId(), process.get().workflowModuleId(), process.get()
+            .bpmnProcessId(), scope
+                .processVersionOf(
+                    event.getProcessDefinitionId()), workflowAggregateId, event
+                        .getProcessInstanceId());
+    eventBeingReported
+        .whileReporting(
+            event,
+            () -> publisher
+                .get()
+                .publishWorkflowEvent(
+                    reference, kind, event.getId(), timestampOf(event, kind), transaction()));
 
   }
 

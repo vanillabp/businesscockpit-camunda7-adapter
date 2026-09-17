@@ -1,7 +1,6 @@
 package io.vanillabp.cockpit.camunda7.test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -180,7 +179,7 @@ public class Camunda7EngineCustomizingTest {
     assertTrue(failure.getMessage().contains(ADAPTER_ID), failure.getMessage());
     // what is missing, and the lowest level which writes it
     assertTrue(failure.getMessage().contains("PROCESS_INSTANCE_START"), failure.getMessage());
-    assertTrue(failure.getMessage().contains("TASK_INSTANCE_CREATE"), failure.getMessage());
+    assertTrue(failure.getMessage().contains("PROCESS_INSTANCE_END"), failure.getMessage());
     assertTrue(failure.getMessage().contains("activity"), failure.getMessage());
     // the boot ends while the configuration is being initialized, so there is no half-built
     // engine left running against the database
@@ -189,20 +188,24 @@ public class Camunda7EngineCustomizingTest {
   }
 
   @Test
-  @DisplayName("A level of its own which writes nothing about tasks ends the boot")
-  public void anEngineWritingNoTaskHistoryEndsTheBoot() {
+  @DisplayName("A level of its own which writes nothing about tasks is enough")
+  public void anEngineWritingNoTaskHistoryIsBuilt() {
 
-    final var configuration = anEngineOf(
-        "cockpit-history-own", new AnApplicationBringing(new OnlyWhatHappenedToTheProcessInstance()));
+    // a user task reaches the cockpit through the listeners of this extension and its report is
+    // built while the listener runs, so task history is nothing the cockpit reads
+    final var engine = anEngineOf(
+        "cockpit-history-own", new AnApplicationBringing(new OnlyWhatHappenedToTheProcessInstance()))
+        .buildProcessEngine();
 
-    final var failure = assertThrows(
-        IllegalStateException.class, configuration::buildProcessEngine);
-
-    assertTrue(failure.getMessage().contains("process-instances-only"), failure.getMessage());
-    assertTrue(failure.getMessage().contains("TASK_INSTANCE_CREATE"), failure.getMessage());
-    // the lifecycle half of what the cockpit reads is written, so it is not among the complaints
-    assertFalse(failure.getMessage().contains("PROCESS_INSTANCE_START"), failure.getMessage());
-    assertNull(configuration.getProcessEngine());
+    try {
+      assertEquals(
+          "process-instances-only",
+          ((ProcessEngineConfigurationImpl) engine.getProcessEngineConfiguration())
+              .getHistoryLevel()
+              .getName());
+    } finally {
+      engine.close();
+    }
 
   }
 

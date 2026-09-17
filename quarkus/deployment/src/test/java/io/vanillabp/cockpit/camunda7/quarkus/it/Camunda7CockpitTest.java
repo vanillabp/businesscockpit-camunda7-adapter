@@ -362,14 +362,19 @@ public class Camunda7CockpitTest {
                 MODULE_ID, TestWorkflowService.BPMN_PROCESS_ID, aggregateId, userTaskId)
             .isPresent());
 
-    // and a task the engine has finished with is read from its history rather than dropped
+    // and a task the engine has finished with is answered no more. Its end was reported while
+    // the task was still there, so there is nothing left for the cockpit to ask about
     engine().getTaskService().complete(userTaskId);
-    final var prefill = bridge()
-        .prefilledUserTaskDetails(
-            new UserTaskReference(
-                ADAPTER_ID, MODULE_ID, TestWorkflowService.BPMN_PROCESS_ID, TestWorkflowService.DEPLOYED_VERSION, aggregateId, workflowId, userTaskId, TestWorkflowService.TASK_DEFINITION, TestWorkflowService.BPMN_TASK_ID));
-    assertTrue(prefill.isPresent(), "the finished task was not found in history");
-    assertEquals("Approve the order", prefill.get().bpmnTaskName());
+    assertTrue(
+        bridge()
+            .prefilledUserTaskDetails(
+                new UserTaskReference(
+                    ADAPTER_ID, MODULE_ID, TestWorkflowService.BPMN_PROCESS_ID, TestWorkflowService.DEPLOYED_VERSION, aggregateId, workflowId, userTaskId, TestWorkflowService.TASK_DEFINITION, TestWorkflowService.BPMN_TASK_ID))
+            .isEmpty(),
+        "a task the engine has finished with was answered from somewhere");
+    final var completed = CockpitServer
+        .awaitRequest("/usertask/%s/completed".formatted(userTaskId));
+    assertTrue(completed.body().contains("Approve the order"), completed.body());
 
   }
 

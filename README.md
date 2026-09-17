@@ -50,11 +50,13 @@ What the core does, class by class:
   built-in listener of all four task events.
 - `Camunda7WorkflowHistoryHandler` turns the engine's process-instance history events into the
   cockpit's workflow events.
-- `Camunda7CockpitEvents` is what both of them report through: it builds the identifiers and writes
-  one outbox entry.
-- `Camunda7CockpitBridge` answers everything the cockpit reads back about a task or a workflow.
-  That happens when the entry is dispatched, and by then the engine's transaction is long
-  committed.
+- `Camunda7CockpitEvents` is what both of them report through: it builds the identifiers and hands
+  the event to the cockpit, which builds the report there and then and writes one outbox entry.
+- `Camunda7EventBeingReported` holds what the engine handed over while that report is built. It is
+  how the bridge answers out of the event instead of querying an engine which cannot answer yet.
+- `Camunda7CockpitBridge` answers everything the cockpit asks about a task or a workflow. At an
+  event it answers out of the event. Where the application asks, through `BusinessCockpitService`,
+  it queries the engine for the state of now.
 - `Camunda7Scope` is how the extension asks what an engine calls things, rather than building a
   prefix or a tenant of its own. Two of those answers are the Camunda 7 adapter's: the tenant a
   workflow module was deployed under, and whether the engine's work runs in the caller's

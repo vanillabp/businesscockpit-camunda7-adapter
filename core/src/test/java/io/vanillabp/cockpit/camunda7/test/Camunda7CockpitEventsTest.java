@@ -27,6 +27,7 @@ import io.vanillabp.camunda7.api.Camunda7EngineFacts;
 import io.vanillabp.camunda7.wiring.Camunda7ProcessVersions;
 import io.vanillabp.camunda7.wiring.Camunda7TaskRegistry;
 import io.vanillabp.cockpit.camunda7.Camunda7CockpitEvents;
+import io.vanillabp.cockpit.camunda7.Camunda7EventBeingReported;
 import io.vanillabp.cockpit.camunda7.Camunda7Scope;
 import io.vanillabp.cockpit.camunda7.Camunda7WorkflowHistoryHandler;
 import io.vanillabp.cockpit.camunda7.Camunda7WorkflowProcesses;
@@ -93,7 +94,7 @@ public class Camunda7CockpitEventsTest {
     final var engine = new Camunda7EngineFacts(
         ADAPTER_ID, scoping, workflowModuleId -> null, taskRegistry);
     events = new Camunda7CockpitEvents(
-        new Camunda7Scope(ADAPTER_ID, scoping, () -> engine), processes, () -> publisher, () -> EventTransaction.CURRENT);
+        new Camunda7Scope(ADAPTER_ID, scoping, () -> engine), processes, new Camunda7EventBeingReported(), () -> publisher, () -> EventTransaction.CURRENT);
 
   }
 
