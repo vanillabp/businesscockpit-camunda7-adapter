@@ -58,7 +58,9 @@ What the core does, class by class:
 - `Camunda7Scope` is how the extension asks what an engine calls things, rather than building a
   prefix or a tenant of its own. Two of those answers are the Camunda 7 adapter's: the tenant a
   workflow module was deployed under, and whether the engine's work runs in the caller's
-  transaction. The extension reads both per configured adapter id.
+  transaction. The extension reads both per configured adapter id. The version of a deployed
+  process comes from there too: what the listeners report and what the bridge reads back have to
+  name one deployment the same way.
 
 The decisions these classes rest on are numbered in [`DECISIONS.md`](./DECISIONS.md), and what a
 user of this extension has to know is in the

@@ -29,6 +29,10 @@ import io.vanillabp.cockpit.extension.spi.WorkflowReference;
   * engine is in the middle of a transaction, and a listener which talks to a server holds that
   * transaction open for as long as the server takes.
  * <p>
+  * The version of the deployed process is one of those identifiers, and the cockpit picks the
+  * details provider of a task or a workflow by it. The Camunda 7 adapter has it cached, so
+  * asking for it here costs the transaction nothing.
+ * <p>
   * The entry is written in the transaction the engine's work happens in, so it becomes visible if
   * and only if that work was committed. An engine which commits on its own has no such
   * transaction to share. The entry then gets one of its own.
@@ -126,9 +130,11 @@ public class Camunda7CockpitEvents {
         .publishUserTaskEvent(
             new UserTaskReference(
                 scope.adapterId(), process.get().workflowModuleId(), process.get()
-                    .bpmnProcessId(), workflowAggregateId, Camunda7Executions
-                        .rootProcessInstanceIdOf(
-                            execution), task.getId(), taskDefinition, bpmnTaskId),
+                    .bpmnProcessId(), scope
+                        .processVersionOf(
+                            definition.getId()), workflowAggregateId, Camunda7Executions
+                                .rootProcessInstanceIdOf(
+                                    execution), task.getId(), taskDefinition, bpmnTaskId),
             kind, "%s#%s".formatted(task.getId(), task.getEventName()), OffsetDateTime.now(), transaction());
 
   }
@@ -167,8 +173,10 @@ public class Camunda7CockpitEvents {
         .publishWorkflowEvent(
             new WorkflowReference(
                 scope.adapterId(), process.get().workflowModuleId(), process.get()
-                    .bpmnProcessId(), workflowAggregateId, event
-                        .getProcessInstanceId()),
+                    .bpmnProcessId(), scope
+                        .processVersionOf(
+                            event.getProcessDefinitionId()), workflowAggregateId, event
+                                .getProcessInstanceId()),
             kind, event.getId(), timestampOf(event, kind), transaction());
 
   }

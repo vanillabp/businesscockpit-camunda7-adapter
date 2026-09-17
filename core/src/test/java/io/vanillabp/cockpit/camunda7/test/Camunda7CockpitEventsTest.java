@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import io.vanillabp.camunda7.api.Camunda7EngineFacts;
+import io.vanillabp.camunda7.wiring.Camunda7ProcessVersions;
 import io.vanillabp.camunda7.wiring.Camunda7TaskRegistry;
 import io.vanillabp.cockpit.camunda7.Camunda7CockpitEvents;
 import io.vanillabp.cockpit.camunda7.Camunda7Scope;
@@ -54,6 +55,15 @@ public class Camunda7CockpitEventsTest {
 
   private static final String BPMN_PROCESS_ID = "AProcess";
 
+  /** The engine's id of the one deployed process definition of this test. */
+  private static final String DEFINITION_ID = "AProcess:4:1";
+
+  /** What the engine counted that deployment as. */
+  private static final String COUNTED_VERSION = "4";
+
+  /** The tag the modeller gave that deployment, which a reference must NOT carry. */
+  private static final String VERSION_TAG = "release-1";
+
   private RecordingPublisher publisher;
 
   private Camunda7WorkflowProcesses processes;
@@ -69,8 +79,19 @@ public class Camunda7CockpitEventsTest {
     // the real name-clash avoidance of an application which configured none, which resolves to
     // 'by-adapter': the workflow module is a tenant of its own and the process id stays plain
     final var scoping = new NameClashAvoidanceService(new MigrationAdapterProperties());
+    // the adapter's own cache of what it deployed, filled the way a deployment fills it: the
+    // extension reads the version from there rather than asking the engine per event
+    final var versions = new Camunda7ProcessVersions(
+        ADAPTER_ID, null, (
+            workflowModuleId,
+            bpmnProcessId) -> bpmnProcessId, workflowModuleId -> workflowModuleId, null);
+    versions
+        .recordDeployed(MODULE_ID, BPMN_PROCESS_ID, DEFINITION_ID, Integer
+            .parseInt(COUNTED_VERSION), VERSION_TAG);
+    final var taskRegistry = new Camunda7TaskRegistry();
+    taskRegistry.setProcessVersions(versions);
     final var engine = new Camunda7EngineFacts(
-        ADAPTER_ID, scoping, workflowModuleId -> null, new Camunda7TaskRegistry());
+        ADAPTER_ID, scoping, workflowModuleId -> null, taskRegistry);
     events = new Camunda7CockpitEvents(
         new Camunda7Scope(ADAPTER_ID, scoping, () -> engine), processes, () -> publisher, () -> EventTransaction.CURRENT);
 
@@ -84,6 +105,7 @@ public class Camunda7CockpitEventsTest {
     final var definition = mock(ProcessDefinitionEntity.class);
     when(definition.getTenantId()).thenReturn(tenantId);
     when(definition.getKey()).thenReturn(processDefinitionKey);
+    when(definition.getId()).thenReturn(DEFINITION_ID);
 
     final var execution = mock(ExecutionEntity.class);
     when(execution.getProcessDefinition()).thenReturn(definition);
@@ -111,6 +133,7 @@ public class Camunda7CockpitEventsTest {
     event.setProcessDefinitionKey(processDefinitionKey);
     event.setBusinessKey(businessKey);
     event.setProcessInstanceId("the-instance");
+    event.setProcessDefinitionId(DEFINITION_ID);
     event.setStartTime(new Date());
     return event;
 
@@ -136,6 +159,26 @@ public class Camunda7CockpitEventsTest {
     assertEquals("the-form", reported.taskDefinition());
     assertEquals("TheTask", reported.bpmnTaskId());
     assertEquals("the-task#create", publisher.userTaskEventIds().getFirst());
+
+  }
+
+  @Test
+  @DisplayName("A task and a workflow carry the version the engine counted, and never its tag")
+  public void theCountedVersionTravelsWithEveryReference() {
+
+    events
+        .reportUserTask(
+            aTaskOf(MODULE_ID, BPMN_PROCESS_ID, "4711"), "TheTask", "the-form",
+            UserTaskEventKind.CREATED);
+    new Camunda7WorkflowHistoryHandler(events)
+        .handleEvent(
+            anInstanceEvent(
+                HistoryEventTypes.PROCESS_INSTANCE_START, MODULE_ID, BPMN_PROCESS_ID, "4711"));
+
+    // the tagged deployment reads 'release-1:4' where an operator sees it, and the cockpit
+    // picks the details provider of a version by what stands here
+    assertEquals(COUNTED_VERSION, publisher.userTasks().getFirst().processVersion());
+    assertEquals(COUNTED_VERSION, publisher.workflows().getFirst().processVersion());
 
   }
 

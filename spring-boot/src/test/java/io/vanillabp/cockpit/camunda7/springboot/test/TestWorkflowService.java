@@ -45,6 +45,12 @@ public class TestWorkflowService {
   /** The BPMN element id of the user task. */
   public static final String BPMN_TASK_ID = "Approve";
 
+  /**
+   * What the engine counted the one deployment of these models as. A reference the test builds
+   * itself carries it, so it says what a reference the extension built would say.
+   */
+  public static final String DEPLOYED_VERSION = "1";
+
   /** The BPMN process whose user task runs once per signer. */
   public static final String MULTI_INSTANCE_PROCESS_ID = "MultiInstanceProcess";
 

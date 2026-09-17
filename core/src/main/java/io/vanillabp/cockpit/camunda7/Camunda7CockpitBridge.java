@@ -161,8 +161,9 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         .filter(instance -> instance.getSuperProcessInstanceId() == null)
         .map(
             instance -> new WorkflowReference(
-                scope.adapterId(), workflowModuleId, bpmnProcessId, workflowAggregateId, instance
-                    .getId()))
+                scope.adapterId(), workflowModuleId, bpmnProcessId, scope
+                    .processVersionOf(
+                        instance.getProcessDefinitionId()), workflowAggregateId, instance.getId()))
         .toList();
 
   }
@@ -250,11 +251,13 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         .map(
             process -> new UserTaskReference(
                 scope.adapterId(), process.workflowModuleId(), process
-                    .bpmnProcessId(), workflowAggregateId, Camunda7Executions
-                        .rootProcessInstanceIdOf(
-                            engine.getHistoryService(), task
-                                .getProcessInstanceId()), task
-                                    .getId(), taskDefinitionOf(task), task.getTaskDefinitionKey()));
+                    .bpmnProcessId(), scope
+                        .processVersionOf(
+                            task.getProcessDefinitionId()), workflowAggregateId, Camunda7Executions
+                                .rootProcessInstanceIdOf(
+                                    engine.getHistoryService(), task
+                                        .getProcessInstanceId()), task
+                                            .getId(), taskDefinitionOf(task), task.getTaskDefinitionKey()));
 
   }
 
@@ -458,6 +461,13 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
 
   /**
    * How Camunda counts the deployed process a workflow runs on, as an operator reads it.
+   * <p>
+    * One deployment yields two strings here, and they go to two places. This one is for a person
+    * to read: with a version tag it reads <code>release-7:4</code>, and it goes into the
+    * prefilled details, which is what the cockpit shows next to a task or a case. The other one
+    * is the version the engine counted, <code>4</code>, and it goes into the reference. That is
+    * what picks the details provider of that version, so it must carry no tag - see
+    * {@link Camunda7Scope#processVersionOf(String)}.
    * <p>
     * The adapter resolved that definition when it first met it, and it answers every later
     * question about it from its own cache. A cockpit asking once per task and once per rendered
