@@ -367,7 +367,7 @@ public class Camunda7CockpitTest {
     final var prefill = bridge()
         .prefilledUserTaskDetails(
             new UserTaskReference(
-                ADAPTER_ID, MODULE_ID, TestWorkflowService.BPMN_PROCESS_ID, aggregateId, workflowId, userTaskId, TestWorkflowService.TASK_DEFINITION, TestWorkflowService.BPMN_TASK_ID));
+                ADAPTER_ID, MODULE_ID, TestWorkflowService.BPMN_PROCESS_ID, TestWorkflowService.DEPLOYED_VERSION, aggregateId, workflowId, userTaskId, TestWorkflowService.TASK_DEFINITION, TestWorkflowService.BPMN_TASK_ID));
     assertTrue(prefill.isPresent(), "the finished task was not found in history");
     assertEquals("Approve the order", prefill.get().bpmnTaskName());
 
@@ -385,14 +385,14 @@ public class Camunda7CockpitTest {
         bridge()
             .prefilledUserTaskDetails(
                 new UserTaskReference(
-                    ADAPTER_ID, MODULE_ID, TestWorkflowService.BPMN_PROCESS_ID, aggregateId, workflowIdOf(
+                    ADAPTER_ID, MODULE_ID, TestWorkflowService.BPMN_PROCESS_ID, TestWorkflowService.DEPLOYED_VERSION, aggregateId, workflowIdOf(
                         aggregate), "no-such-task", TestWorkflowService.TASK_DEFINITION, TestWorkflowService.BPMN_TASK_ID))
             .isEmpty());
     assertTrue(
         bridge()
             .prefilledWorkflowDetails(
                 new WorkflowReference(
-                    ADAPTER_ID, MODULE_ID, TestWorkflowService.BPMN_PROCESS_ID, aggregateId, "no-such-workflow"))
+                    ADAPTER_ID, MODULE_ID, TestWorkflowService.BPMN_PROCESS_ID, TestWorkflowService.DEPLOYED_VERSION, aggregateId, "no-such-workflow"))
             .isEmpty());
     assertTrue(
         bridge()

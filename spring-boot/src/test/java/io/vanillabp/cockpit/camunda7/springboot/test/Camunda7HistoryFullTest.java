@@ -156,8 +156,9 @@ public class Camunda7HistoryFullTest {
         .singleResult()
         .getId();
     return new UserTaskReference(
-        "c7", MODULE_ID, TestWorkflowService.BPMN_PROCESS_ID, String.valueOf(aggregate
-            .getId()), workflowId, userTaskId, TestWorkflowService.TASK_DEFINITION, TestWorkflowService.BPMN_TASK_ID);
+        "c7", MODULE_ID, TestWorkflowService.BPMN_PROCESS_ID, TestWorkflowService.DEPLOYED_VERSION, String
+            .valueOf(aggregate
+                .getId()), workflowId, userTaskId, TestWorkflowService.TASK_DEFINITION, TestWorkflowService.BPMN_TASK_ID);
 
   }
 

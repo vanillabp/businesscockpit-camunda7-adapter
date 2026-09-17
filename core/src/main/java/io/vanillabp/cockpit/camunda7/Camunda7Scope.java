@@ -19,6 +19,10 @@ import io.vanillabp.integration.adapter.spi.NameClashAvoidanceSupport;
   * what the adapter resolves when it deploys that module. Asking anywhere else means querying a
   * tenant the engine never stored.
  * <p>
+  * The version of a deployed process is asked here as well. It is not a name, but it is the
+  * same kind of answer: the adapter knows it, both halves of this extension have to spell it
+  * alike, and working it out a second time would let them drift apart.
+ * <p>
   * That answer is asked for when it is needed rather than when this scope is built. An engine is
   * built with what this extension contributes to it, so there is nothing to ask about the engine
   * while it is being built. By the time anything is reported or read back, the engine exists.
@@ -65,6 +69,37 @@ public final class Camunda7Scope {
       final String workflowModuleId) {
 
     return engine.get().tenantIdOf(workflowModuleId);
+
+  }
+
+  /**
+   * Which deployed version of its BPMN process a task or a workflow belongs to, as this engine
+   * counted it: a number counted upwards per process id, and nothing else.
+   * <p>
+    * It is what a reference of the cockpit carries, and the cockpit picks the details provider
+    * of a task or a workflow by it. So it is the plain version and never a version dressed up
+    * for a person to read. How an operator reads the same deployment is
+    * <code>DeployedProcessVersion.displayVersion()</code>, which adds the version tag, and
+    * <code>Camunda7CockpitBridge</code> reports that one in the prefilled details.
+   * <p>
+    * The answer comes from the Camunda 7 adapter's cache. The adapter resolves a definition once
+    * and answers every later question about it for free, so a cockpit asking per task and per
+    * rendered page pays the engine for none of them. It is asked here for the same reason the
+    * tenant is: an event the listeners report and a read the bridge answers have to name one
+    * deployment the same way.
+   *
+   * @param processDefinitionId The engine's process definition id
+   * @return The version the engine counted, or <code>null</code> where nobody can name it: the
+   *         engine does not hold that definition any more, or the adapter has no deployment
+   *         service for this adapter id yet
+   */
+  public String processVersionOf(
+      final String processDefinitionId) {
+
+    final var deployed = engine.get().definitionOf(processDefinitionId);
+    return deployed == null
+        ? null
+        : deployed.version();
 
   }
 

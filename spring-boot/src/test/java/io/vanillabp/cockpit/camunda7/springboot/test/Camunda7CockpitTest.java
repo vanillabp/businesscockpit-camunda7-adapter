@@ -423,8 +423,9 @@ public class Camunda7CockpitTest {
       final String userTaskId) {
 
     return new UserTaskReference(
-        "c7", MODULE_ID, TestWorkflowService.BPMN_PROCESS_ID, String.valueOf(aggregate.getId()), workflowIdOf(
-            aggregate), userTaskId, TestWorkflowService.TASK_DEFINITION, TestWorkflowService.BPMN_TASK_ID);
+        "c7", MODULE_ID, TestWorkflowService.BPMN_PROCESS_ID, TestWorkflowService.DEPLOYED_VERSION, String
+            .valueOf(aggregate.getId()), workflowIdOf(
+                aggregate), userTaskId, TestWorkflowService.TASK_DEFINITION, TestWorkflowService.BPMN_TASK_ID);
 
   }
 
@@ -727,7 +728,7 @@ public class Camunda7CockpitTest {
         bridge()
             .prefilledWorkflowDetails(
                 new WorkflowReference(
-                    "c7", MODULE_ID, TestWorkflowService.BPMN_PROCESS_ID, String
+                    "c7", MODULE_ID, TestWorkflowService.BPMN_PROCESS_ID, TestWorkflowService.DEPLOYED_VERSION, String
                         .valueOf(aggregate.getId()), "no-such-workflow"))
             .isEmpty());
     assertTrue(

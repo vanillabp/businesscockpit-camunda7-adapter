@@ -39,6 +39,12 @@ public class TestWorkflowService {
   /** The BPMN element id of the user task. */
   public static final String BPMN_TASK_ID = "Approve";
 
+  /**
+   * What the engine counted the one deployment of these models as. A reference the test builds
+   * itself carries it, so it says what a reference the extension built would say.
+   */
+  public static final String DEPLOYED_VERSION = "1";
+
   /** The BPMN process whose user task runs once per signer. */
   public static final String MULTI_INSTANCE_PROCESS_ID = "MultiInstanceProcess";
 
@@ -60,6 +66,21 @@ public class TestWorkflowService {
   /** What the details provider writes into the aggregate, so that a test can see it ran. */
   public static final String APPROVE_NOTE = "seen by the details provider";
 
+  /** The detail every provider below writes, so that a test can read which of them ran. */
+  public static final String SERVED_BY = "servedBy";
+
+  /** What the provider serving the first deployed model writes into the details of its task. */
+  public static final String APPROVE_OF_THE_FIRST = "the task as the first model asked for it";
+
+  /** What the provider serving every later model writes there. */
+  public static final String APPROVE_OF_THE_LATER = "the task as a later model asks for it";
+
+  /** What the provider serving the first deployed model writes into the workflow's details. */
+  public static final String WORKFLOW_OF_THE_FIRST = "the case as the first model asked for it";
+
+  /** What the provider serving every later model writes there. */
+  public static final String WORKFLOW_OF_THE_LATER = "the case as a later model asks for it";
+
   @Inject
   ProcessService<TestAggregate> processService;
 
@@ -80,15 +101,36 @@ public class TestWorkflowService {
    * @param event What happened to the task
    * @return The very object it was given
    */
-  @UserTaskDetailsProvider(taskDefinition = TASK_DEFINITION)
+  @UserTaskDetailsProvider(taskDefinition = TASK_DEFINITION, version = "1")
   public UserTaskDetails approve(
       final TestAggregate aggregate,
       final PrefilledUserTaskDetails prefilled,
       @DetailsEvent final DetailsEvent.Event event) {
 
     aggregate.setNote(APPROVE_NOTE);
-    prefilled.setDetails(Map.of("customer", aggregate.getCustomer(), "event", event.name()));
+    prefilled
+        .setDetails(
+            Map
+                .of(
+                    "customer", aggregate.getCustomer(), "event", event.name(), SERVED_BY,
+                    APPROVE_OF_THE_FIRST));
     prefilled.setCandidateGroups(List.of("approvers"));
+    return prefilled;
+
+  }
+
+  /**
+   * The same task as every model deployed after the first asks for it. The two ranges do not
+   * overlap, which is what lets both methods name the same task.
+   *
+   * @param prefilled What the engine knew about the task
+   * @return The enriched details
+   */
+  @UserTaskDetailsProvider(taskDefinition = TASK_DEFINITION, version = ">1")
+  public UserTaskDetails approveOfALaterModel(
+      final PrefilledUserTaskDetails prefilled) {
+
+    prefilled.setDetails(Map.of(SERVED_BY, APPROVE_OF_THE_LATER));
     return prefilled;
 
   }
@@ -129,18 +171,35 @@ public class TestWorkflowService {
   }
 
   /**
-   * The one provider a BPMN process may have for its workflow.
+   * The workflow as the first deployed model asked for it.
    *
    * @param aggregate The workflow aggregate
    * @param prefilled What the engine knew about the workflow
    * @return The enriched details
    */
-  @WorkflowDetailsProvider
+  @WorkflowDetailsProvider(version = "1")
   public WorkflowDetails workflowDetails(
       final TestAggregate aggregate,
       final PrefilledWorkflowDetails prefilled) {
 
-    prefilled.setDetails(Map.of("customer", aggregate.getCustomer()));
+    prefilled
+        .setDetails(Map.of("customer", aggregate.getCustomer(), SERVED_BY, WORKFLOW_OF_THE_FIRST));
+    return prefilled;
+
+  }
+
+  /**
+   * The same workflow as every model deployed after the first asks for it. A workflow provider
+   * stands for the whole BPMN process, so the version is the only thing telling these two apart.
+   *
+   * @param prefilled What the engine knew about the workflow
+   * @return The enriched details
+   */
+  @WorkflowDetailsProvider(version = ">1")
+  public WorkflowDetails workflowDetailsOfALaterModel(
+      final PrefilledWorkflowDetails prefilled) {
+
+    prefilled.setDetails(Map.of(SERVED_BY, WORKFLOW_OF_THE_LATER));
     return prefilled;
 
   }
