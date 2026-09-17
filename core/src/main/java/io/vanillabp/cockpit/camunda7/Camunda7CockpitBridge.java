@@ -294,9 +294,10 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
     * done to the task. A task which is being completed still answers its variables here, which
     * is the one thing reading it back afterwards could never do.
    * <p>
-    * The one field the engine cannot answer at an event is who started the case. Camunda 7
-    * records that in history alone, and the history of this command is not written yet. See
-    * {@link #theUserTheEngineIsActingFor()} for what the cockpit gets instead.
+    * One field of a prefill stays empty here and in the read below: the initiator. Camunda 7
+    * records who started a case in the history of the process instance, so a user task never
+    * carried it without a second query, and at the moment of an event no query reaches it at
+    * all. Nothing else is put there instead - see decision 10 in the repository's DECISIONS.md.
    *
    * @param task The task of the listener
    * @param bpmnProcessId The BPMN process as the application wrote it, the fallback for a model
@@ -321,7 +322,6 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
                 ? null
                 : execution.getProcessInstanceId())
         .businessId(execution.getBusinessKey())
-        .initiator(theUserTheEngineIsActingFor())
         .assignee(task.getAssignee())
         .candidateUsers(candidates.users())
         .candidateGroups(candidates.groups())
@@ -380,7 +380,6 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         .workflowId(Camunda7Executions.rootProcessInstanceIdOf(workflow))
         .subWorkflowId(subWorkflowIdOf(workflow))
         .businessId(workflow == null ? null : workflow.getBusinessKey())
-        .initiator(theUserTheEngineIsActingFor())
         .assignee(task.getAssignee())
         .candidateUsers(candidates.users())
         .candidateGroups(candidates.groups())
@@ -389,27 +388,6 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         .variables(variablesOf(task.getId()))
         .multiInstances(multiInstancesOf(Camunda7MultiInstances.of(engine, task.getExecutionId())))
         .build();
-
-  }
-
-  /**
-   * Who the engine is acting for, which is who caused what is being reported about a user task.
-   * <p>
-    * That is what the cockpit shows next to a task and what its notifications read: a change
-    * somebody made themselves is not announced to them again. An application which authenticates
-    * nobody in the engine reports nothing here, which is the same answer version 1 gave for every
-    * task.
-   * <p>
-    * Who STARTED the case is a different question, and it is the one a workflow answers. Camunda
-    * 7 records that in the history of the process instance, so a user task never carried it
-    * without a second query, and at the moment of an event no query can reach it at all.
-   */
-  private String theUserTheEngineIsActingFor() {
-
-    final var authentication = engine.getIdentityService().getCurrentAuthentication();
-    return authentication == null
-        ? null
-        : authentication.getUserId();
 
   }
 

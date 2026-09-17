@@ -234,12 +234,16 @@ was true when it happened rather than what is true when the server comes back. A
 was just created is reported at all: its report used to be built from a historic process instance
 which does not exist yet.
 
-One thing gets worse. Who started a case is in the history of the process instance and nowhere
-else. A start event carries it, an end event does not repeat it, and a task event never had it
-without a second query. So the `initiator` of a user task is now who the engine is acting for,
-which is who caused the event, and which is what the cockpit shows and what its notifications read.
-The `initiator` of a case is still who started it, reported with its creation. An end reports none,
-and the cockpit keeps what the creation told it.
+The `initiator` of a user task is not prefilled at all. Camunda 7 records who started a case in the
+history of the process instance and nowhere else. A start event of that instance carries it, an end
+event does not repeat it, and an event about a task never had it without a second query, which is
+exactly the query this decision took out. Nothing is put there instead, and the field stays empty.
+What a user task's initiator should mean, and what the cockpit's notifications make of it, belongs
+to the work about organizing user tasks. It is decided there rather than answered here with the
+nearest value at hand.
+
+The `initiator` of a case is untouched. It is who started it, and it is reported with the case's
+creation. An end reports none, and the cockpit keeps what the creation told it.
 
 Two readings are gone with all this. A task the engine has finished with is not looked up in the
 historic task instances any more, and its candidates are not replayed from the identity-link log. The report

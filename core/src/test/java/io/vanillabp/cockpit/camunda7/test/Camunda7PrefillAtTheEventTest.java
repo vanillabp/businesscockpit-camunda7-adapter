@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.camunda.bpm.engine.IdentityService;
 import org.camunda.bpm.engine.ProcessEngine;
 import org.camunda.bpm.engine.TaskService;
 import org.camunda.bpm.engine.delegate.DelegateTask;
@@ -115,8 +114,6 @@ public class Camunda7PrefillAtTheEventTest {
   private ProcessEngine anEngine() {
 
     taskService = mock(TaskService.class);
-    final var identityService = mock(IdentityService.class);
-    when(identityService.getCurrentAuthentication()).thenReturn(null);
 
     final var commandExecutor = mock(CommandExecutor.class);
     when(commandExecutor.execute(any()))
@@ -126,7 +123,6 @@ public class Camunda7PrefillAtTheEventTest {
 
     final var engine = mock(ProcessEngine.class);
     when(engine.getTaskService()).thenReturn(taskService);
-    when(engine.getIdentityService()).thenReturn(identityService);
     when(engine.getProcessEngineConfiguration()).thenReturn(configuration);
     return engine;
 
@@ -229,6 +225,9 @@ public class Camunda7PrefillAtTheEventTest {
           assertEquals(INSTANCE_ID, prefill.workflowId());
           assertNull(prefill.subWorkflowId(), "a task of a root instance named a called workflow");
           assertEquals("4711", prefill.businessId());
+          // no initiator, and nothing in its place: what an initiator of a user task should say
+          // is not this adapter's question - see decision 10 in the repository's DECISIONS.md
+          assertNull(prefill.initiator(), "a user task was reported with an initiator");
           assertEquals("anna", prefill.assignee());
           assertEquals(List.of("approvers"), prefill.candidateGroups());
           assertEquals(List.of("bert"), prefill.candidateUsers());
