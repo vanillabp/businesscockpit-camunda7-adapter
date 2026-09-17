@@ -38,22 +38,23 @@ import io.vanillabp.integration.adapter.spi.NameClashAvoidanceSupport;
 public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
 
   /**
-   * The history events the cockpit lives on. A workflow's lifecycle is what the engine wrote
-   * about the process instance, and a user task the engine has already finished with is read
-   * back from what it wrote about the task instance.
+   * The history events the cockpit lives on: what the engine writes about a process instance.
+   * That is how a workflow's start, its end and its cancellation reach the cockpit, and it is
+   * how the cockpit finds the cases of one workflow aggregate again.
    * <p>
-    * Every one of Camunda's own levels from <code>activity</code> upwards produces all of them.
+    * Nothing about a task is in this list, although the engine writes task history too. A user
+    * task reaches the cockpit through the listeners of this extension, and its report is built
+    * while the listener runs, so the cockpit never reads a historic task instance.
+    * See decision 10 in the repository's DECISIONS.md.
+   * <p>
+    * Every one of Camunda's own levels from <code>activity</code> upwards writes these three.
     * What <code>audit</code> adds on top is variable and form-property history, which the cockpit
-    * does not read. The identity-link log naming the candidates of a finished task is written at
-    * <code>full</code> alone. The bridge treats it as optional, so it is not among the events an
-    * engine is held to here.
+    * does not read either.
    */
   private static final Set<HistoryEventTypes> HISTORY_EVENTS_THE_COCKPIT_READS = Set
       .of(
           HistoryEventTypes.PROCESS_INSTANCE_START, HistoryEventTypes.PROCESS_INSTANCE_UPDATE,
-          HistoryEventTypes.PROCESS_INSTANCE_END, HistoryEventTypes.TASK_INSTANCE_CREATE,
-          HistoryEventTypes.TASK_INSTANCE_UPDATE, HistoryEventTypes.TASK_INSTANCE_COMPLETE,
-          HistoryEventTypes.TASK_INSTANCE_DELETE);
+          HistoryEventTypes.PROCESS_INSTANCE_END);
 
   private final Camunda7WorkflowProcesses processes;
 
@@ -64,6 +65,8 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
   private final Supplier<BusinessCockpitEventPublisher> publisher;
 
   private final Map<String, Camunda7CockpitEvents> eventsByAdapterId = new ConcurrentHashMap<>();
+
+  private final Map<String, Camunda7EventBeingReported> eventsBeingReportedByAdapterId = new ConcurrentHashMap<>();
 
   private final Map<String, Camunda7Scope> scopesByAdapterId = new ConcurrentHashMap<>();
 
@@ -183,9 +186,9 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
   }
 
   /**
-   * Everything the cockpit shows comes out of the engine's history, so an engine which writes
-   * none of it would leave the application running and the cockpit empty without anything
-   * saying why.
+   * A workflow reaches the cockpit through the engine's history, so an engine which writes none
+   * of it would leave the application running and the cockpit without a single case, without
+   * anything saying why.
    * <p>
     * The level is asked rather than compared against a list of names. A level is an object an
     * application may bring along itself, and it answers per event type. Asked with no entity it
@@ -217,14 +220,12 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
         """
             The Business Cockpit observes the Camunda 7 engine of the adapter '%s'. That engine \
             is configured with the history level '%s', and that level does not write these \
-            history events: %s. The cockpit reads a workflow's lifecycle from what the engine \
-            wrote about the process instance. It reads a user task the engine has already \
-            finished with from what it wrote about the task instance. Workflows and tasks would \
-            therefore be missing from the cockpit. The lowest of Camunda's levels writing all of \
-            them is '%s', and the engine's own default is '%s', so this engine was given its \
-            level by an engine plugin or by a Camunda7EngineCustomizer of this application. \
-            Configure it with '%s' or above, or take the Business Cockpit out of the \
-            application."""
+            history events: %s. The cockpit learns that a workflow started, ended or was \
+            cancelled from what the engine writes about the process instance, so no business \
+            case would ever appear in it. The lowest of Camunda's levels writing all of them is \
+            '%s', and the engine's own default is '%s', so this engine was given its level by an \
+            engine plugin or by a Camunda7EngineCustomizer of this application. Configure it \
+            with '%s' or above, or take the Business Cockpit out of the application."""
             .formatted(
                 adapterId, level.getName(), String.join(", ", missing),
                 ProcessEngineConfiguration.HISTORY_ACTIVITY,
@@ -244,7 +245,21 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
         .computeIfAbsent(
             adapterId,
             id -> new Camunda7CockpitEvents(
-                scopeOf(id), processes, publisher, () -> transactionOf(id)));
+                scopeOf(id), processes, eventBeingReportedOf(id), publisher, () -> transactionOf(id)));
+
+  }
+
+  /**
+   * @param adapterId The configured adapter id
+   * @return Where the event of that engine is put while its report is built. The bridge of the
+   *         same adapter id takes it from there, which is what makes a report carry the state of
+   *         its event
+   */
+  public Camunda7EventBeingReported eventBeingReportedOf(
+      final String adapterId) {
+
+    return eventsBeingReportedByAdapterId
+        .computeIfAbsent(adapterId, id -> new Camunda7EventBeingReported());
 
   }
 

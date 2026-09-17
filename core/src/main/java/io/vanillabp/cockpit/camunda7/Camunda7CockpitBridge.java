@@ -2,9 +2,9 @@ package io.vanillabp.cockpit.camunda7;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.Collection;
 import java.util.Date;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -12,10 +12,13 @@ import java.util.Optional;
 import java.util.function.Supplier;
 
 import org.camunda.bpm.engine.ProcessEngine;
+import org.camunda.bpm.engine.delegate.DelegateTask;
 import org.camunda.bpm.engine.history.HistoricProcessInstance;
-import org.camunda.bpm.engine.history.HistoricTaskInstance;
 import org.camunda.bpm.engine.impl.cfg.ProcessEngineConfigurationImpl;
+import org.camunda.bpm.engine.impl.history.event.HistoricProcessInstanceEventEntity;
+import org.camunda.bpm.engine.impl.persistence.entity.ExecutionEntity;
 import org.camunda.bpm.engine.repository.ProcessDefinition;
+import org.camunda.bpm.engine.task.IdentityLink;
 import org.camunda.bpm.engine.task.IdentityLinkType;
 import org.camunda.bpm.engine.task.Task;
 
@@ -29,28 +32,34 @@ import io.vanillabp.cockpit.extension.spi.UserTaskDetailsPrefill;
 import io.vanillabp.cockpit.extension.spi.UserTaskReference;
 import io.vanillabp.cockpit.extension.spi.WorkflowDetailsPrefill;
 import io.vanillabp.cockpit.extension.spi.WorkflowReference;
+import io.vanillabp.integration.adapter.spi.workflowtask.MultiInstanceValue;
 import io.vanillabp.integration.extension.spi.handler.HandlerMultiInstance;
 
 /**
  * What one configured Camunda 7 engine can be asked about a task or a workflow.
  * <p>
-  * Everything here runs long after the event which caused the question. An outbox entry is
-  * dispatched once the transaction the engine reported in was committed, and the three
-  * <code>…OfAggregate</code> methods answer an application which just changed its aggregate. So
-  * the state read here is the current one. A repeated report tells the cockpit what is true now,
-  * not what was true when the entry was written.
+ * <b>Two ways in, and which one runs is decided by the caller.</b>
  * <p>
-  * A task the engine no longer holds is looked up in history instead. That is not an edge case. A
-  * task somebody completed within a second of its creation is normal, and reporting its creation
-  * from history is better than losing the task from the cockpit's list of what happened.
+  * A report is built at the moment of the event, inside the engine command which fired it. The
+  * two <code>prefilled…</code> methods then answer out of what the engine handed to the listener
+  * or to the history handler, which {@link Camunda7EventBeingReported} holds while that report is
+  * built. Nothing is queried there, and for a good reason: the command has not been flushed yet,
+  * so the history of this very event is not written, and a query for it answers nothing at all.
+  * The event itself says everything a report needs.
+ * <p>
+  * The other way in is a question of <code>BusinessCockpitService</code>, and no event is
+  * anywhere near it. The application reads a task it names, or it says that its aggregate
+  * changed. The engine is then queried for the state of now, which is what such a question asks
+  * for. The three <code>…OfAggregate</code> methods are always that way in, and the two
+  * <code>prefilled…</code> methods take it whenever this thread reports no event about the task
+  * or the workflow they were asked about.
+ * <p>
+  * A task the engine has finished with is answered by neither. The report of its end was built
+  * while the task was still there, and a question about a running task is about a task which is
+  * running. So nothing is read from the historic task instance any more, and nothing from the
+  * identity-link log.
  */
 public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
-
-  /**
-   * What the engine writes as the operation of an identity-link log entry when a candidate was
-   * added; anything else in that column took one away. The engine's API names neither.
-   */
-  private static final String IDENTITY_LINK_ADDED = "add";
 
   private final Camunda7Scope scope;
 
@@ -58,23 +67,29 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
 
   private final Camunda7WorkflowProcesses processes;
 
+  private final Camunda7EventBeingReported eventBeingReported;
+
   private final ProcessEngine engine;
 
   /**
    * @param scope The engine this bridge serves
    * @param engineFacts What the Camunda 7 adapter knows about that engine
    * @param processes The deployed processes, to translate the engine's identifiers back
+   * @param eventBeingReported What the engine handed over for the event being reported, shared
+   *          with {@link Camunda7CockpitEvents} which puts it there
    * @param engine The engine
    */
   public Camunda7CockpitBridge(
       final Camunda7Scope scope,
       final Camunda7EngineFacts engineFacts,
       final Camunda7WorkflowProcesses processes,
+      final Camunda7EventBeingReported eventBeingReported,
       final ProcessEngine engine) {
 
     this.scope = scope;
     this.engineFacts = engineFacts;
     this.processes = processes;
+    this.eventBeingReported = eventBeingReported;
     this.engine = engine;
 
   }
@@ -93,34 +108,43 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
 
   }
 
+  /**
+   * What the cockpit shows about a user task: the values of the event being reported, or the
+   * values of now where the application asks about the task.
+   */
   @Override
   public Optional<UserTaskDetailsPrefill> prefilledUserTaskDetails(
       final UserTaskReference userTask) {
 
-    return inOneEngineCommand(() -> {
-      final var task = engine
-          .getTaskService()
-          .createTaskQuery()
-          .taskId(userTask.userTaskId())
-          .singleResult();
-      if (task != null) {
-        return Optional.of(prefillOf(task, userTask.bpmnProcessId()));
-      }
-      final var historic = engine
-          .getHistoryService()
-          .createHistoricTaskInstanceQuery()
-          .taskId(userTask.userTaskId())
-          .singleResult();
-      return Optional
-          .ofNullable(historic)
-          .map(gone -> prefillOf(gone, userTask.bpmnProcessId()));
-    });
+    final var beingReported = eventBeingReported.userTask(userTask.userTaskId());
+    if (beingReported.isPresent()) {
+      return Optional.of(prefillOfTheEvent(beingReported.get(), userTask.bpmnProcessId()));
+    }
+
+    return inOneEngineCommand(
+        () -> Optional
+            .ofNullable(
+                engine
+                    .getTaskService()
+                    .createTaskQuery()
+                    .taskId(userTask.userTaskId())
+                    .singleResult())
+            .map(running -> prefillOfTheRunningTask(running, userTask.bpmnProcessId())));
 
   }
 
+  /**
+   * What the cockpit shows about a workflow: the values of the event being reported, or the
+   * values of now where the application says that its aggregate changed.
+   */
   @Override
   public Optional<WorkflowDetailsPrefill> prefilledWorkflowDetails(
       final WorkflowReference workflow) {
+
+    final var beingReported = eventBeingReported.workflow(workflow.workflowId());
+    if (beingReported.isPresent()) {
+      return Optional.of(prefillOfTheEvent(beingReported.get(), workflow.bpmnProcessId()));
+    }
 
     return inOneEngineCommand(() -> {
       final var instance = historicWorkflow(workflow.workflowId());
@@ -261,13 +285,92 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
 
   }
 
-  private UserTaskDetailsPrefill prefillOf(
+  /**
+   * A user task as the engine handed it to the listener.
+   * <p>
+    * Every field comes off the task, its execution and the process definition that execution
+    * runs on. None of it is a query, and that is what makes this readable inside the engine
+    * command: the objects are the ones the command is working with, and they carry what was just
+    * done to the task. A task which is being completed still answers its variables here, which
+    * is the one thing reading it back afterwards could never do.
+   * <p>
+    * One field of a prefill stays empty here and in the read below: the initiator. Camunda 7
+    * records who started a case in the history of the process instance, so a user task never
+    * carried it without a second query, and at the moment of an event no query reaches it at
+    * all. Nothing else is put there instead - see decision 10 in the repository's DECISIONS.md.
+   *
+   * @param task The task of the listener
+   * @param bpmnProcessId The BPMN process as the application wrote it, the fallback for a model
+   *          without a name
+   */
+  private UserTaskDetailsPrefill prefillOfTheEvent(
+      final DelegateTask task,
+      final String bpmnProcessId) {
+
+    final var execution = (ExecutionEntity) task.getExecution();
+    final var rootProcessInstanceId = Camunda7Executions.rootProcessInstanceIdOf(execution);
+    final var candidates = candidatesOf(task.getCandidates());
+
+    return UserTaskDetailsPrefill
+        .builder()
+        .bpmnProcessVersion(versionOf(execution.getProcessDefinitionId()))
+        .bpmnProcessName(processNameOf(execution.getProcessDefinition(), bpmnProcessId))
+        .bpmnTaskName(task.getName())
+        .workflowId(rootProcessInstanceId)
+        .subWorkflowId(
+            execution.getProcessInstanceId().equals(rootProcessInstanceId)
+                ? null
+                : execution.getProcessInstanceId())
+        .businessId(execution.getBusinessKey())
+        .assignee(task.getAssignee())
+        .candidateUsers(candidates.users())
+        .candidateGroups(candidates.groups())
+        .dueDate(atOffset(task.getDueDate()))
+        .followUpDate(atOffset(task.getFollowUpDate()))
+        .variables(task.getVariables())
+        .multiInstances(multiInstancesOf(Camunda7MultiInstances.of(task.getExecution())))
+        .build();
+
+  }
+
+  /**
+   * A workflow as the engine handed its history event to the handler.
+   * <p>
+    * The event carries the business key, the process definition and its name, and a start event
+    * carries who started the case. An end event does not repeat who started it, so the report of
+    * an end leaves that empty and the cockpit keeps what the creation told it.
+    * See decision 10 in the repository's DECISIONS.md.
+   *
+   * @param event The history event of the process instance
+   * @param bpmnProcessId The BPMN process as the application wrote it, the fallback for a model
+   *          without a name
+   */
+  private WorkflowDetailsPrefill prefillOfTheEvent(
+      final HistoricProcessInstanceEventEntity event,
+      final String bpmnProcessId) {
+
+    final var name = event.getProcessDefinitionName();
+    return new WorkflowDetailsPrefill(
+        versionOf(event.getProcessDefinitionId()), event.getBusinessKey(), (name == null) || name.isBlank()
+            ? bpmnProcessId
+            : name, event.getStartUserId());
+
+  }
+
+  /**
+   * A user task the engine holds right now, which is what the application asks about.
+   * <p>
+    * The business case the task belongs to is read off the process instance rather than off the
+    * task, although the task records it too. The instance is in hand here anyway, and taking it
+    * from one place means one rule about what a root is.
+   */
+  private UserTaskDetailsPrefill prefillOfTheRunningTask(
       final Task task,
       final String bpmnProcessId) {
 
     final var definition = definitionOf(task.getProcessDefinitionId());
     final var workflow = historicWorkflow(task.getProcessInstanceId());
-    final var candidates = candidatesOf(task.getId());
+    final var candidates = candidatesOf(engine.getTaskService().getIdentityLinksForTask(task.getId()));
 
     return UserTaskDetailsPrefill
         .builder()
@@ -277,49 +380,13 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         .workflowId(Camunda7Executions.rootProcessInstanceIdOf(workflow))
         .subWorkflowId(subWorkflowIdOf(workflow))
         .businessId(workflow == null ? null : workflow.getBusinessKey())
-        .initiator(workflow == null ? null : workflow.getStartUserId())
         .assignee(task.getAssignee())
         .candidateUsers(candidates.users())
         .candidateGroups(candidates.groups())
         .dueDate(atOffset(task.getDueDate()))
         .followUpDate(atOffset(task.getFollowUpDate()))
         .variables(variablesOf(task.getId()))
-        .multiInstances(multiInstancesOf(task.getExecutionId()))
-        .build();
-
-  }
-
-  /**
-    * A task the engine has finished with. History records what the task looked like, and, where
-    * the engine keeps an identity-link log, who its candidates were. The variables it saw are not
-    * read, so a details provider of such a task sees none.
-   * <p>
-    * The business case the task belongs to is read off the process instance rather than off the
-    * task, although the task records it too. The instance is in hand here anyway, and taking it
-    * from one place means one rule about what a root is.
-   */
-  private UserTaskDetailsPrefill prefillOf(
-      final HistoricTaskInstance task,
-      final String bpmnProcessId) {
-
-    final var definition = definitionOf(task.getProcessDefinitionId());
-    final var workflow = historicWorkflow(task.getProcessInstanceId());
-    final var candidates = historicCandidatesOf(task.getId());
-
-    return UserTaskDetailsPrefill
-        .builder()
-        .bpmnProcessVersion(versionOf(task.getProcessDefinitionId()))
-        .bpmnProcessName(processNameOf(definition, bpmnProcessId))
-        .bpmnTaskName(task.getName())
-        .workflowId(Camunda7Executions.rootProcessInstanceIdOf(workflow))
-        .subWorkflowId(subWorkflowIdOf(workflow))
-        .businessId(workflow == null ? null : workflow.getBusinessKey())
-        .initiator(workflow == null ? null : workflow.getStartUserId())
-        .assignee(task.getAssignee())
-        .candidateUsers(candidates.users())
-        .candidateGroups(candidates.groups())
-        .dueDate(atOffset(task.getDueDate()))
-        .followUpDate(atOffset(task.getFollowUpDate()))
+        .multiInstances(multiInstancesOf(Camunda7MultiInstances.of(engine, task.getExecutionId())))
         .build();
 
   }
@@ -363,14 +430,22 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
                             List<String> groups) {
   }
 
-  private Candidates candidatesOf(
-      final String taskId) {
+  /**
+   * Who may work on a task, out of the identity links it carries.
+   * <p>
+    * Both ways in hand over the same links. A listener has them on the task the engine gave it,
+    * and a task the engine was queried for is asked for them. Only the links which say candidate
+    * are read: an assignee and an owner are links as well, and the cockpit shows them as what
+    * they are.
+   *
+   * @param links The identity links of the task
+   */
+  private static Candidates candidatesOf(
+      final Collection<? extends IdentityLink> links) {
 
     final var users = new LinkedList<String>();
     final var groups = new LinkedList<String>();
-    engine
-        .getTaskService()
-        .getIdentityLinksForTask(taskId)
+    links
         .stream()
         .filter(link -> IdentityLinkType.CANDIDATE.equals(link.getType()))
         .forEach(link -> {
@@ -378,46 +453,6 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
             groups.add(link.getGroupId());
           } else if (link.getUserId() != null) {
             users.add(link.getUserId());
-          }
-        });
-    return new Candidates(List.copyOf(users), List.copyOf(groups));
-
-  }
-
-  /**
-    * Who was a candidate for a task the engine no longer holds. The engine keeps a log of the
-    * identity links it added and removed only at history level <code>full</code>. Below that the
-    * log is empty, and a finished task is reported without candidates rather than with wrong
-    * ones. Where there is a log, it is replayed in the order the engine wrote it, so a candidate
-    * somebody took away again is not reported as one.
-   */
-  private Candidates historicCandidatesOf(
-      final String taskId) {
-
-    final var users = new LinkedHashSet<String>();
-    final var groups = new LinkedHashSet<String>();
-    engine
-        .getHistoryService()
-        .createHistoricIdentityLinkLogQuery()
-        .taskId(taskId)
-        .type(IdentityLinkType.CANDIDATE)
-        .orderByTime()
-        .asc()
-        .list()
-        .forEach(entry -> {
-          final var named = entry.getGroupId() != null
-              ? groups
-              : users;
-          final var candidate = entry.getGroupId() != null
-              ? entry.getGroupId()
-              : entry.getUserId();
-          if (candidate == null) {
-            return;
-          }
-          if (IDENTITY_LINK_ADDED.equals(entry.getOperationType())) {
-            named.add(candidate);
-          } else {
-            named.remove(candidate);
           }
         });
     return new Candidates(List.copyOf(users), List.copyOf(groups));
@@ -550,15 +585,14 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
     * Copying them is done in this one place, and the map keeps the order the adapter promises,
     * outermost first.
    *
-   * @param executionId The execution the user task runs in
+   * @param scopes What the adapter answered
    * @return The scopes, keyed by BPMN element id
    */
-  private Map<String, HandlerMultiInstance> multiInstancesOf(
-      final String executionId) {
+  private static Map<String, HandlerMultiInstance> multiInstancesOf(
+      final Map<String, MultiInstanceValue> scopes) {
 
     final var outermostFirst = new LinkedHashMap<String, HandlerMultiInstance>();
-    Camunda7MultiInstances
-        .of(engine, executionId)
+    scopes
         .forEach(
             (
                 elementId,

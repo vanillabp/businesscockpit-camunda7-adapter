@@ -8,9 +8,10 @@ import io.vanillabp.cockpit.extension.spi.UserTaskEventKind;
 /**
  * The listener the Business Cockpit attaches to one user task of one engine.
  * <p>
- * It knows its element from the moment the engine parsed it, so an event costs a lookup of the
- * process and one outbox entry. Everything the cockpit shows about the task is read later,
- * when the entry is dispatched and the engine's transaction is long committed.
+ * It knows its element from the moment the engine parsed it, so an event costs no lookup in the
+ * model. What the cockpit shows about the task is built here, out of the task the engine handed
+ * over, and it travels with the outbox entry. Nothing is sent from here, so the engine's
+ * transaction is not held open for a server.
  */
 public class Camunda7UserTaskListener implements TaskListener {
 

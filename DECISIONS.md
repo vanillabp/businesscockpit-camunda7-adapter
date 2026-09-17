@@ -151,6 +151,10 @@ the message points at.
 
 ## 8. An engine writing none of the history the cockpit reads ends the boot
 
+*Superseded by decision 10.* The check itself stayed, and so did the reason for it. What fell away
+is the task history: a report is built while the listener runs, so the cockpit never reads a
+historic task instance, and an engine which writes none of that runs the cockpit fine.
+
 A workflow's lifecycle is what the engine wrote about the process instance. A user task somebody
 finished before its report was dispatched is read back from what it wrote about the task instance.
 Camunda writes both from history level `activity` upwards. What `audit` adds on top is variable and
@@ -197,3 +201,52 @@ honest answer rather than the correct one. Entry and engine work commit separate
 between the two can leave the cockpit told about something the engine rolled back. An
 application which wants them committed together puts the engine on the application's data
 source, and then this answer is `true` on either platform.
+
+## 10. The report is built at the event, out of what the engine handed over
+
+The Business Cockpit used to build a report when the outbox entry was dispatched. It builds it at
+the moment of the event now, and the report travels with the entry. That is the cockpit's own
+decision, written down in `business-cockpit`. What follows here is what it means for a Camunda 7
+engine.
+
+A report is built inside the engine command which fired the event. The command has not been
+flushed yet. So the history of this very event is not in the database, and a query for it answers
+nothing at all: a workflow which was just started is not in the historic process instances, and a
+task which is being completed answers no variables any more. The old reading through the engine's
+query API therefore cannot stay where a report is built.
+
+It does not have to. Everything a report needs is in what the engine handed over. A task listener
+gets the task, its execution and the process definition that execution runs on, and that carries
+the assignee, the candidates, the due and follow-up dates, the BPMN names, the business key and
+every variable the task can see. The handler of a process-instance history event gets the business
+key, the process definition with its name and, for a start, who started the case.
+
+The query stays for what the application asks. `BusinessCockpitService.getUserTask` reads a task
+somebody names, and `aggregateChanged` says that a case changed. No event is near either of
+them, and both are about the state of now. `Camunda7CockpitBridge` therefore has two ways in, and
+which one runs is decided by the caller rather than configured: while this thread reports an event
+about that very task or that very workflow, the answer comes out of the event, and otherwise out of
+the engine. `Camunda7EventBeingReported` is what carries it from one half to the other.
+
+Three things get better. A completed task reports the variables it saw, which no later reading could
+recover. A report which waits in the outbox, because the cockpit server is down, says what
+was true when it happened rather than what is true when the server comes back. And a workflow which
+was just created is reported at all: its report used to be built from a historic process instance
+which does not exist yet.
+
+The `initiator` of a user task is not prefilled at all. Camunda 7 records who started a case in the
+history of the process instance and nowhere else. A start event of that instance carries it, an end
+event does not repeat it, and an event about a task never had it without a second query, which is
+exactly the query this decision took out. Nothing is put there instead, and the field stays empty.
+What a user task's initiator should mean, and what the cockpit's notifications make of it, belongs
+to the work about organizing user tasks. It is decided there rather than answered here with the
+nearest value at hand.
+
+The `initiator` of a case is untouched. It is who started it, and it is reported with the case's
+creation. An end reports none, and the cockpit keeps what the creation told it.
+
+Two readings are gone with all this. A task the engine has finished with is not looked up in the
+historic task instances any more, and its candidates are not replayed from the identity-link log. The report
+of its end was built while the task was still there, and a question of the application is about a
+task which is running. Nothing else ever read them, so an engine which writes no task history runs
+this extension fine, and the boot check of decision 8 asks for the process-instance events alone.

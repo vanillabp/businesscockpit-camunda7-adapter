@@ -18,6 +18,11 @@ vanillabp:
       adapters:
         c7:
           resources-location: classpath:c7-cockpit/processes
+      workflows:
+        CockpitProcess:
+          allow-full-sync-with-bpms: true
+        MultiInstanceProcess:
+          allow-full-sync-with-bpms: true
       cockpit:
         workflow-module-uri: http://localhost:8081/c7-cockpit
         ui-uri-type: WEBPACK_MF_REACT

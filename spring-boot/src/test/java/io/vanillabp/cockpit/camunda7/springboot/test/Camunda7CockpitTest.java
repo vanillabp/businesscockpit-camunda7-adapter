@@ -42,10 +42,10 @@ import io.vanillabp.integration.test.utils.SuppressOutputExtension;
  * request the cockpit server receives.
  * <p>
  * Nothing on that way is faked but the cockpit server itself: the engine runs the workflow, its
- * built-in task listeners and its history handler write an outbox entry inside the engine's own
- * transaction, the entry is dispatched after that transaction committed, the engine is read
- * again, the application's details provider runs and changes the workflow aggregate, and what
- * arrives at the server is asserted.
+ * built-in task listeners and its history handler report what happened, the report is built out
+ * of that event and the application's details provider runs on it, the outbox entry carrying it
+ * is written inside the engine's own transaction, and what arrives at the server once that
+ * transaction committed is asserted.
  */
 @SpringBootTest(classes = TestApplication.class)
 @ExtendWith(SuppressOutputExtension.class)
@@ -56,6 +56,13 @@ import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 public class Camunda7CockpitTest {
 
   private static final String MODULE_ID = "c7-cockpit";
+
+  /**
+   * Who the one test about a refused report assigns its task to. The cockpit server is shared by
+   * every test class of this module, and a report is told apart from another one's by what it
+   * carries. So this name belongs to that test and to no other.
+   */
+  private static final String THE_ASSIGNEE_OF_THIS_TEST = "quirins-approver";
 
   /**
    * How often the application repeats a transaction which read a conflict. Two would do for the
@@ -99,11 +106,11 @@ public class Camunda7CockpitTest {
    * carries a version attribute has to do it: in a transaction which is repeated where somebody
    * else wrote the same case in between.
    * <p>
-   * That somebody is the Business Cockpit itself. Its details provider reads the case while a
-   * report is dispatched and writes it back when that dispatch commits, so the two transactions
-   * overlap whenever an application changes a case it has just reported. Without the version
-   * attribute the later of the two writers wins silently; with it, one of them reads a conflict
-   * and repeats.
+   * That somebody is the Business Cockpit itself. Its details provider reads the case whenever
+   * the engine reports something, and it writes the case back. Where that report happens on a
+   * thread of the engine, a job executor above all, the two transactions overlap. Without the
+   * version attribute the later of the two writers wins silently; with it, one of them reads a
+   * conflict and repeats.
    *
    * @param aggregateId The case to change
    * @param changeAndReport Changes the attached case and reports it to the cockpit
@@ -247,12 +254,9 @@ public class Camunda7CockpitTest {
 
     // The customer in that body is what the details provider read off the case, so the report
     // shows that the provider ran on the real aggregate. Whether the case KEEPS what that
-    // provider wrote into it is not asserted, on purpose. The write rides the transaction which
-    // dispatches the report, and the report is sent before that transaction commits. So the
-    // commit can still be refused, by another writer of the same case running into the version
-    // attribute. The report stands and the write is gone with the transaction. When the outbox
-    // dispatches the entry again is nobody's promise, so a test waiting for that write waits on
-    // something it does not control.
+    // provider wrote into it is not asserted, on purpose. The write rides the transaction the
+    // engine reported in, and that transaction can still be rolled back by whoever is in it.
+    // The entry would then be gone with it, and so would the write.
 
   }
 
@@ -326,10 +330,9 @@ public class Camunda7CockpitTest {
           workflowService.businessCockpit().aggregateChanged(attached);
         });
 
-    // the report carries what the application wrote, not what the case said before it. The
-    // report of the user task may still be dispatching while this runs, and its details provider
-    // holds the case over this transaction - the version attribute of TestAggregate is what
-    // keeps that dispatch from writing the older reading back
+    // the report carries what the application wrote, not what the case said before it. It is
+    // built inside this very transaction, so the details provider reads the case the application
+    // has just changed and has not written yet
     awaitReportCarrying(
         "/workflow/%s/updated".formatted(workflowId), "Emil the second", aggregate);
 
@@ -464,6 +467,38 @@ public class Camunda7CockpitTest {
         bodies.stream().anyMatch(body -> body.contains("\"signerVariable\":\"anna\"")),
         bodies.toString());
     bodies.forEach(body -> assertTrue(body.contains("\"orderKind\":\"express\""), body));
+
+  }
+
+  @Test
+  @DisplayName("The end of a task reports the variables that task saw, which nothing could read afterwards")
+  public void aCompletedTaskReportsWhatItSaw() {
+
+    final var aggregate = transactions
+        .execute(status -> {
+          final var fresh = new TestAggregate();
+          fresh.setCustomer("Rosa");
+          fresh.setSigners(List.of("rosa"));
+          return aggregates.save(fresh);
+        });
+    engine
+        .getRuntimeService()
+        .createProcessInstanceByKey(TestWorkflowService.MULTI_INSTANCE_PROCESS_ID)
+        .processDefinitionTenantId(MODULE_ID)
+        .businessKey(String.valueOf(aggregate.getId()))
+        .setVariable(TestWorkflowService.ORDER_KIND_VARIABLE, "overnight")
+        .execute();
+
+    final var signing = userTaskIdOf(aggregate);
+    engine.getTaskService().complete(signing);
+
+    // the signing task is gone with that call, and so are the variables it could see: an engine
+    // holds none for a task it has finished with. The details provider bound them from the task
+    // the listener was given, which is the whole point of building the report there
+    final var completed = CockpitServer
+        .awaitRequest("/usertask/%s/completed".formatted(signing));
+    assertTrue(completed.body().contains("\"signerVariable\":\"rosa\""), completed.body());
+    assertTrue(completed.body().contains("\"orderKind\":\"overnight\""), completed.body());
 
   }
 
@@ -621,20 +656,54 @@ public class Camunda7CockpitTest {
   }
 
   @Test
-  @DisplayName("A task the engine has finished with is read from its history")
-  public void aFinishedTaskIsReadFromHistory() {
+  @DisplayName("A task the engine has finished with is answered no more, and its end was reported anyway")
+  public void aFinishedTaskIsNotReadAgain() {
 
     final var aggregate = aStartedWorkflow("Klara");
     final var userTaskId = userTaskIdOf(aggregate);
     final var reference = referenceOf(aggregate, userTaskId);
     engine.getTaskService().complete(userTaskId);
 
-    final var prefill = bridge().prefilledUserTaskDetails(reference);
+    // the report of the completion was built while the task was still there, so nothing is
+    // left to read afterwards - and the cockpit asks for nothing afterwards either
+    assertTrue(
+        bridge().prefilledUserTaskDetails(reference).isEmpty(),
+        "a task the engine has finished with was answered from somewhere");
 
-    assertTrue(prefill.isPresent(), "the finished task was not found in history");
-    assertEquals("Approve the order", prefill.get().bpmnTaskName());
-    assertEquals(String.valueOf(aggregate.getId()), prefill.get().businessId());
-    assertEquals(List.of(), prefill.get().candidateUsers());
+    // and the end was reported all the same, with the BPMN name of the task and with what the
+    // details provider made of it
+    final var completed = CockpitServer
+        .awaitRequest("/usertask/%s/completed".formatted(userTaskId));
+    assertTrue(completed.body().contains("Approve the order"), completed.body());
+    assertTrue(completed.body().contains("\"customer\":\"Klara\""), completed.body());
+
+  }
+
+  @Test
+  @DisplayName("A report waiting for a cockpit server carries the state of its event, not of its dispatch")
+  public void aReportCarriesTheStateOfItsEvent() {
+
+    final var aggregate = aStartedWorkflow("Quirin");
+    final var userTaskId = userTaskIdOf(aggregate);
+    CockpitServer.awaitRequest("/usertask/created");
+
+    // the first attempt is refused, so this report leaves the application after the engine
+    // changed the task and finished with it. Whenever the outbox gets to it, it says what the
+    // engine said when the assignment happened
+    CockpitServer.refuseRequestsAbout(THE_ASSIGNEE_OF_THIS_TEST, 1);
+    engine.getTaskService().setAssignee(userTaskId, THE_ASSIGNEE_OF_THIS_TEST);
+
+    engine.getTaskService().complete(userTaskId);
+
+    // that this report arrives at all is the assertion. By the time the outbox tries it again,
+    // the engine holds no such task any more. A report built at the dispatch would find nothing
+    // to say about a running task and would be dropped for good
+    final var updated = CockpitServer
+        .awaitRequest("/usertask/%s/updated".formatted(userTaskId), THE_ASSIGNEE_OF_THIS_TEST);
+    assertTrue(
+        updated.body().contains("\"assignee\":\"%s\"".formatted(THE_ASSIGNEE_OF_THIS_TEST)),
+        updated.body());
+    assertTrue(updated.body().contains("\"customer\":\"Quirin\""), updated.body());
 
   }
 

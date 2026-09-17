@@ -30,16 +30,15 @@ import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 /**
  * An application whose engine keeps the least history the cockpit can work with.
  * <p>
-  * Camunda's <code>activity</code> writes what happened to a process instance and what happened
-  * to a task, which is everything the cockpit reads. What the level above it adds is variable and
-  * form-property history, and none of that is asked for here. So an application which lowered its
-  * engine to it gets a cockpit which works. This test walks the whole way to prove it: a workflow
-  * starts, its task appears, both are reported, both are reported again when the task is
-  * completed, and the finished task is still readable afterwards.
+  * Camunda's <code>activity</code> writes what happened to a process instance, which is what the
+  * cockpit reads. What the levels above it add is task, variable and form-property history, and
+  * none of that is asked for. So an application which lowered its engine to it gets a cockpit
+  * which works. This test walks the whole way to prove it: a workflow starts, its task appears,
+  * both are reported, and both are reported again when the task is completed.
  * <p>
- * What such an engine cannot answer is who was a candidate for a task it has finished with, since
- * the identity-link log belongs to <code>full</code>. That is asserted here as well, because it is
- * the one thing an application gives up by going this low.
+  * A task carries as much at this level as at any other. Everything the cockpit shows about it
+  * comes off the task the engine handed to the listener, and the candidates of a task do too.
+  * That is asserted here, because at this level there is no history of a task to fall back on.
  */
 @SpringBootTest(classes = {
     TestApplication.class, Camunda7HistoryActivityTest.AnEngineKeepingTheLeastThatWorks.class
@@ -243,14 +242,15 @@ public class Camunda7HistoryActivityTest {
   }
 
   @Test
-  @DisplayName("A finished task is read from history, and it has no candidates to report")
-  public void aFinishedTaskIsReadWithoutItsCandidates() {
+  @DisplayName("A task keeps its candidates at this level, and its end is reported without any task history")
+  public void aCompletedTaskIsReportedWithoutAnyTaskHistory() {
 
     final var aggregate = aStartedWorkflow("Rudi");
     final var userTaskId = userTaskIdOf(aggregate);
+    final var thisCase = "\"customer\":\"Rudi\"";
 
-    // while the task runs the engine holds its identity links, so the candidate is there to be
-    // read; once the task is gone only the log would know, and this level writes none
+    // while the task runs the engine holds its identity links, and a question of the
+    // application reads them there
     engine.getTaskService().addCandidateGroup(userTaskId, "auditors");
     assertEquals(
         List.of("auditors"),
@@ -261,11 +261,14 @@ public class Camunda7HistoryActivityTest {
 
     engine.getTaskService().complete(userTaskId);
 
-    final var prefill = bridge().prefilledUserTaskDetails(referenceOf(aggregate, userTaskId));
-    assertTrue(prefill.isPresent(), "the finished task was not found in history");
-    assertEquals("Approve the order", prefill.get().bpmnTaskName());
-    assertEquals(String.valueOf(aggregate.getId()), prefill.get().businessId());
-    assertEquals(List.of(), prefill.get().candidateGroups());
+    // the report of the completion was built while the task was still there. Afterwards there
+    // is nothing left to read: this level writes no task history, and the engine holds no
+    // finished task
+    final var completed = awaitReport("/usertask/%s/completed".formatted(userTaskId), thisCase);
+    assertTrue(completed.contains("\"event\":\"COMPLETED\""), completed);
+    assertTrue(
+        bridge().prefilledUserTaskDetails(referenceOf(aggregate, userTaskId)).isEmpty(),
+        "a task the engine has finished with was answered from somewhere");
 
   }
 
