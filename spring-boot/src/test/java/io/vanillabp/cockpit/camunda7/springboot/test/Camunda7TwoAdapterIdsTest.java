@@ -140,7 +140,7 @@ public class Camunda7TwoAdapterIdsTest {
           return workflowService.processes().startWorkflow(aggregate);
         });
 
-    CockpitServer.awaitRequest("/usertask/created");
+    CockpitServer.awaitAnyRequest("/usertask/created");
     CockpitServer.awaitQuiet();
 
     assertEquals(

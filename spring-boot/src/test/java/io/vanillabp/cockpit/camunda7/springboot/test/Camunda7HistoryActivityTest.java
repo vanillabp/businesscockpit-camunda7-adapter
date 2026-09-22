@@ -236,8 +236,8 @@ public class Camunda7HistoryActivityTest {
 
     engine.getTaskService().complete(userTaskId);
 
-    CockpitServer.awaitRequest("/usertask/%s/completed".formatted(userTaskId));
-    CockpitServer.awaitRequest("/workflow/%s/completed".formatted(workflowId));
+    CockpitServer.awaitAnyRequest("/usertask/%s/completed".formatted(userTaskId));
+    CockpitServer.awaitAnyRequest("/workflow/%s/completed".formatted(workflowId));
 
   }
 

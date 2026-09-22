@@ -199,13 +199,13 @@ public class Camunda7CockpitTest {
     final var started = aStartedWorkflow("Anna");
     userTaskIdOf(started);
 
-    final var workflow = CockpitServer.awaitRequest("/workflow/created");
+    final var workflow = CockpitServer.awaitAnyRequest("/workflow/created");
     assertTrue(workflow.body().contains("\"customer\":\"Anna\""), workflow.body());
     assertTrue(
         workflow.body().contains("\"businessId\":\"%s\"".formatted(started.getId())),
         workflow.body());
 
-    final var userTask = CockpitServer.awaitRequest("/usertask/created");
+    final var userTask = CockpitServer.awaitAnyRequest("/usertask/created");
     assertTrue(userTask.body().contains("\"customer\":\"Anna\""), userTask.body());
     assertTrue(
         userTask
@@ -231,8 +231,8 @@ public class Camunda7CockpitTest {
 
     engine().getTaskService().complete(userTaskId);
 
-    CockpitServer.awaitRequest("/usertask/%s/completed".formatted(userTaskId));
-    CockpitServer.awaitRequest("/workflow/%s/completed".formatted(workflowId));
+    CockpitServer.awaitAnyRequest("/usertask/%s/completed".formatted(userTaskId));
+    CockpitServer.awaitAnyRequest("/workflow/%s/completed".formatted(workflowId));
 
   }
 
@@ -246,8 +246,8 @@ public class Camunda7CockpitTest {
 
     engine().getRuntimeService().deleteProcessInstance(workflowId, "the test cancelled it");
 
-    CockpitServer.awaitRequest("/usertask/%s/cancelled".formatted(userTaskId));
-    CockpitServer.awaitRequest("/workflow/%s/cancelled".formatted(workflowId));
+    CockpitServer.awaitAnyRequest("/usertask/%s/cancelled".formatted(userTaskId));
+    CockpitServer.awaitAnyRequest("/workflow/%s/cancelled".formatted(workflowId));
 
   }
 
@@ -260,7 +260,7 @@ public class Camunda7CockpitTest {
 
     engine().getTaskService().setAssignee(userTaskId, "anna");
 
-    final var updated = CockpitServer.awaitRequest("/usertask/%s/updated".formatted(userTaskId));
+    final var updated = CockpitServer.awaitAnyRequest("/usertask/%s/updated".formatted(userTaskId));
     assertTrue(updated.body().contains("\"assignee\":\"anna\""), updated.body());
 
   }
@@ -373,7 +373,7 @@ public class Camunda7CockpitTest {
             .isEmpty(),
         "a task the engine has finished with was answered from somewhere");
     final var completed = CockpitServer
-        .awaitRequest("/usertask/%s/completed".formatted(userTaskId));
+        .awaitAnyRequest("/usertask/%s/completed".formatted(userTaskId));
     assertTrue(completed.body().contains("Approve the order"), completed.body());
 
   }
