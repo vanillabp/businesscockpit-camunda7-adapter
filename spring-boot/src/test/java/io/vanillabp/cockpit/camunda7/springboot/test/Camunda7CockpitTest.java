@@ -235,14 +235,16 @@ public class Camunda7CockpitTest {
     final var aggregate = aStartedWorkflow("Anna");
     userTaskIdOf(aggregate);
 
-    final var workflow = CockpitServer.awaitAnyRequest("/workflow/created");
+    // both reports are awaited by the id of this case: '/workflow/created' and
+    // '/usertask/created' are paths every case reports on, so waiting on the path alone
+    // takes whichever report arrived first and asserts against a case nobody asked about
+    final var thisCase = "\"businessId\":\"%s\"".formatted(aggregate.getId());
+
+    final var workflow = CockpitServer.awaitRequest("/workflow/created", thisCase);
     assertTrue(workflow.body().contains("\"customer\":\"Anna\""), workflow.body());
-    assertTrue(
-        workflow.body().contains("\"businessId\":\"%s\"".formatted(aggregate.getId())),
-        workflow.body());
     assertTrue(workflow.body().contains(TestWorkflowService.BPMN_PROCESS_ID), workflow.body());
 
-    final var userTask = CockpitServer.awaitAnyRequest("/usertask/created");
+    final var userTask = CockpitServer.awaitRequest("/usertask/created", thisCase);
     assertTrue(userTask.body().contains("\"customer\":\"Anna\""), userTask.body());
     assertTrue(userTask.body().contains("\"event\":\"CREATED\""), userTask.body());
     assertTrue(
