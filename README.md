@@ -99,6 +99,13 @@ mvn install
 two lifecycles per module. It has to be `install` rather than `package`, because the Quarkus tests
 load the modules of this repository from the local Maven repository.
 
+The last module of the reactor is `test-coverage-report/coverage-gate`. It reads the two aggregated
+reports and breaks the build when a platform is below its threshold in the root POM
+(`coverage.threshold.spring-boot`, `coverage.threshold.quarkus`). The reports are written in the
+`verify` phase, so a run which stops at `package` never gets there. The gate then prints a line per
+platform saying that the coverage was not checked, and those two tests are reported as skipped,
+instead of failing over a file the run could not have written.
+
 The tests boot real applications on both platforms: a Spring Boot context and a Quarkus application,
 each with an embedded Camunda 7 engine on H2, a cockpit server the test runs itself and the outbox
 in between. No BPMS double and no mock of the engine, because what is under test is exactly the
