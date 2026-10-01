@@ -25,12 +25,24 @@ vanillabp:
       workflows:
         CockpitProcess:
           allow-full-sync-with-bpms: true
+          declared-aggregate-values:
+            - signers
+            - version
         MultiInstanceProcess:
           allow-full-sync-with-bpms: true
+          declared-aggregate-values:
+            - signers
+            - version
         NoFormKeyProcess:
           allow-full-sync-with-bpms: true
+          declared-aggregate-values:
+            - signers
+            - version
         ExpressionFormKeyProcess:
           allow-full-sync-with-bpms: true
+          declared-aggregate-values:
+            - signers
+            - version
       cockpit:
         workflow-module-uri: http://localhost:8081/c7-cockpit
         ui-uri-type: WEBPACK_MF_REACT

@@ -2,7 +2,15 @@ package io.vanillabp.cockpit.camunda7.quarkus.it;
 
 import java.util.List;
 
-/** The business case of the test: what the workflow is about. */
+/**
+ * The business case of the test: what the workflow is about.
+ * <p>
+ * Only a boolean and a text mean the same in every expression language, so every other value
+ * an aggregate shares is declared first. Here that is {@code signers}, and every workflow of
+ * the test application's configuration names it under {@code declared-aggregate-values}. The
+ * declaration says that the application looked at the value and knows what Camunda 7 makes of
+ * it.
+ */
 public class TestAggregate {
 
   private Long id;

@@ -21,6 +21,12 @@ import jakarta.persistence.Version;
   * the later of the two writers reads a conflict instead. The application answers it by repeating
   * its transaction. The dispatch answers it by leaving its outbox entry unfinished, so the report
   * goes out again from a fresh reading of the case. When that happens is not promised to anybody.
+ * <p>
+ * Only a boolean and a text mean the same in every expression language, so every other value
+ * an aggregate shares is declared first. Here that is {@code signers} and {@code version}, and
+ * every workflow of {@code application.yaml} names the two under
+ * {@code declared-aggregate-values}. The declaration says that the application looked at the
+ * value and knows what Camunda 7 makes of it.
  */
 @Entity
 public class TestAggregate {
