@@ -2,6 +2,7 @@ package io.vanillabp.cockpit.camunda7.springboot.test;
 
 import java.util.List;
 
+import io.vanillabp.spi.service.NoSyncWithBPMS;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -21,6 +22,12 @@ import jakarta.persistence.Version;
   * the later of the two writers reads a conflict instead. The application answers it by repeating
   * its transaction. The dispatch answers it by leaving its outbox entry unfinished, so the report
   * goes out again from a fresh reading of the case. When that happens is not promised to anybody.
+ * <p>
+ * {@code signers} travels to the BPMS because a model reads it: the multi-instance task of
+ * {@code MultiInstanceProcess} loops over that list. Only a boolean and a text mean the same in
+ * every expression language, so a list is declared under {@code declared-aggregate-values}
+ * before it may travel, and {@code application.yaml} does that for every workflow of this
+ * aggregate.
  */
 @Entity
 public class TestAggregate {
@@ -29,7 +36,12 @@ public class TestAggregate {
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  /** What the persistence increments per write, and what a second writer runs into. */
+  /**
+   * What the persistence increments per write, and what a second writer runs into. It stays in
+   * the application: no model of this workflow reads it, and the number says nothing a BPMN
+   * model could decide on.
+   */
+  @NoSyncWithBPMS
   @Version
   private Long version;
 

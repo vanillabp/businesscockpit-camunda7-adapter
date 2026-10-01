@@ -2,7 +2,15 @@ package io.vanillabp.cockpit.camunda7.quarkus.it;
 
 import java.util.List;
 
-/** The business case of the test: what the workflow is about. */
+/**
+ * The business case of the test: what the workflow is about.
+ * <p>
+ * {@code signers} travels to the BPMS because a model reads it: the multi-instance task of
+ * {@code MultiInstanceProcess} loops over that list. Only a boolean and a text mean the same in
+ * every expression language, so a list is declared under {@code declared-aggregate-values}
+ * before it may travel, and the configuration of this test application does that for every
+ * workflow.
+ */
 public class TestAggregate {
 
   private Long id;
