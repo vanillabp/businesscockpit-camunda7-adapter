@@ -237,10 +237,11 @@ which does not exist yet.
 The `initiator` of a user task is not prefilled at all. Camunda 7 records who started a case in the
 history of the process instance and nowhere else. A start event of that instance carries it, an end
 event does not repeat it, and an event about a task never had it without a second query, which is
-exactly the query this decision took out. Nothing is put there instead, and the field stays empty.
-What a user task's initiator should mean, and what the cockpit's notifications make of it, belongs
-to the work about organizing user tasks. It is decided there rather than answered here with the
-nearest value at hand.
+exactly the query this decision took out. Nothing is put there instead, and this adapter leaves the
+field empty. What a report finally carries is answered where the rule lives, which is the cockpit's
+extension: it demands an initiator and takes the value a details provider of the application set,
+or the constant for a module which knows no action a user causes. An adapter which knows nobody
+writes nobody, and that is the whole of its part.
 
 The `initiator` of a case is untouched. It is who started it, and it is reported with the case's
 creation. An end reports none, and the cockpit keeps what the creation told it.
