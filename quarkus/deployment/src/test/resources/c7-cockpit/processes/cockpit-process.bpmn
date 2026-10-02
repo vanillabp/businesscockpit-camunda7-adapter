@@ -29,4 +29,42 @@
       <bpmn:incoming>MI_ToEnd</bpmn:incoming>
     </bpmn:endEvent>
   </bpmn:process>
+  <!-- the caller of the test about a level the cockpit used to lose. Its call activity names
+       the process it calls in an expression, so the deployment could write nothing onto it,
+       and it iterates over the signers. The business key is passed by the model: the adapter
+       injects that only where it knows which process is called. -->
+  <bpmn:process id="ExpressionCallProcess" isExecutable="true">
+    <bpmn:startEvent id="EC_Start">
+      <bpmn:outgoing>EC_ToCall</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:sequenceFlow id="EC_ToCall" sourceRef="EC_Start" targetRef="EC_Call" />
+    <bpmn:callActivity id="EC_Call" calledElement="${calledProcess}">
+      <bpmn:extensionElements>
+        <camunda:in businessKey="#{execution.processBusinessKey}" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>EC_ToCall</bpmn:incoming>
+      <bpmn:outgoing>EC_ToEnd</bpmn:outgoing>
+      <bpmn:multiInstanceLoopCharacteristics isSequential="false" camunda:collection="${signers}" camunda:elementVariable="signer" />
+    </bpmn:callActivity>
+    <bpmn:sequenceFlow id="EC_ToEnd" sourceRef="EC_Call" targetRef="EC_End" />
+    <bpmn:endEvent id="EC_End">
+      <bpmn:incoming>EC_ToEnd</bpmn:incoming>
+    </bpmn:endEvent>
+  </bpmn:process>
+  <!-- the process that call activity calls. It iterates over nothing itself, so every level
+       its user task reports belongs to the caller. -->
+  <bpmn:process id="CalledSignProcess" isExecutable="true">
+    <bpmn:startEvent id="CS_Start">
+      <bpmn:outgoing>CS_ToSign</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:sequenceFlow id="CS_ToSign" sourceRef="CS_Start" targetRef="CS_Sign" />
+    <bpmn:userTask id="CS_Sign" name="Sign the round of the caller" camunda:formKey="callerSign">
+      <bpmn:incoming>CS_ToSign</bpmn:incoming>
+      <bpmn:outgoing>CS_ToEnd</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="CS_ToEnd" sourceRef="CS_Sign" targetRef="CS_End" />
+    <bpmn:endEvent id="CS_End">
+      <bpmn:incoming>CS_ToEnd</bpmn:incoming>
+    </bpmn:endEvent>
+  </bpmn:process>
 </bpmn:definitions>

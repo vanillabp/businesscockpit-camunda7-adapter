@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.camunda.bpm.engine.ProcessEngine;
@@ -70,6 +71,12 @@ public class Camunda7CockpitTest {
    * next report does not end the test.
    */
   private static final int ATTEMPTS_OF_THE_APPLICATION = 3;
+
+  /**
+   * The two rounds the caller of the expression-named call activity runs, one string apiece, so
+   * that both ways into the bridge are compared as values.
+   */
+  private static final Set<String> THE_TWO_ROUNDS_OF_THE_CALLER = Set.of("anna#0/2", "bert#1/2");
 
   @DynamicPropertySource
   static void cockpitServer(
@@ -469,6 +476,155 @@ public class Camunda7CockpitTest {
         bodies.stream().anyMatch(body -> body.contains("\"signerVariable\":\"anna\"")),
         bodies.toString());
     bodies.forEach(body -> assertTrue(body.contains("\"orderKind\":\"express\""), body));
+
+  }
+
+  /**
+   * A case whose caller iterates over its signers and calls the signing process once per round,
+   * naming that process in an expression.
+   *
+   * @param customer What the case is called
+   * @return The saved case, whose id is the business key of every instance started here
+   */
+  private TestAggregate aCallerOverTwoSigners(
+      final String customer) {
+
+    final var aggregate = transactions
+        .execute(status -> {
+          final var fresh = new TestAggregate();
+          fresh.setCustomer(customer);
+          fresh.setSigners(List.of("anna", "bert"));
+          return aggregates.save(fresh);
+        });
+    engine
+        .getRuntimeService()
+        .createProcessInstanceByKey(TestWorkflowService.EXPRESSION_CALL_PROCESS_ID)
+        .processDefinitionTenantId(MODULE_ID)
+        .businessKey(String.valueOf(aggregate.getId()))
+        // what the deployment could not read: the process to call is chosen per instance
+        .setVariable(
+            TestWorkflowService.CALLED_PROCESS_VARIABLE, TestWorkflowService.CALLED_SIGN_PROCESS_ID)
+        .execute();
+    return aggregate;
+
+  }
+
+  /**
+   * The round of the caller as the cockpit reports it while the task is created, which is the
+   * way in through the event.
+   */
+  @Test
+  @DisplayName("The round of a caller reaches the cockpit although the call activity names the called process in an expression")
+  public void theLevelOfACallerReachesTheCockpit() {
+
+    aCallerOverTwoSigners("Nadia");
+
+    final var bodies = awaitTheSigningOfTheCaller();
+
+    THE_TWO_ROUNDS_OF_THE_CALLER
+        .forEach(
+            round -> assertTrue(
+                bodies.stream().anyMatch(body -> body.contains("\"callerRound\":\"%s\"".formatted(round))),
+                "the details of the task do not name the round '%s' the model runs, %s"
+                    .formatted(round, bodies)));
+
+  }
+
+  /**
+   * The same round read off the engine instead, which is the other way in. The two ways hand the
+   * walk different things, an execution and an id, so one of them answering is no reason to
+   * believe the other does.
+   */
+  @Test
+  @DisplayName("The same round is answered when the task is read instead of reported")
+  public void theLevelOfACallerIsAnsweredWhenTheTaskIsRead() {
+
+    final var aggregate = aCallerOverTwoSigners("Olivia");
+    final var signing = awaitTheSigningTasks(aggregate);
+
+    final var answered = signing
+        .stream()
+        .map(
+            task -> bridge()
+                .prefilledUserTaskDetails(signingReferenceOf(aggregate, task))
+                .orElseThrow()
+                .multiInstances()
+                .get(TestWorkflowService.CALL_ACTIVITY_ELEMENT))
+        .map(
+            level -> level == null
+                ? "nothing"
+                : "%s#%s/%s".formatted(level.element(), level.index(), level.total()))
+        .collect(Collectors.toSet());
+
+    assertEquals(
+        THE_TWO_ROUNDS_OF_THE_CALLER,
+        answered,
+        "reading the task answers other rounds than the model runs");
+
+  }
+
+  /** The user tasks of the called process, one per round of the caller. */
+  private List<Task> awaitTheSigningTasks(
+      final TestAggregate aggregate) {
+
+    final var deadline = System.currentTimeMillis() + 30000;
+    while (System.currentTimeMillis() < deadline) {
+      final var tasks = engine
+          .getTaskService()
+          .createTaskQuery()
+          .processInstanceBusinessKey(String.valueOf(aggregate.getId()))
+          .taskDefinitionKey(TestWorkflowService.CALLER_SIGN_TASK_ID)
+          .list();
+      if (tasks.size() >= 2) {
+        return tasks;
+      }
+      sleep();
+    }
+    throw new AssertionError(
+        "Fewer than two signing tasks of the called process appeared for case %s"
+            .formatted(aggregate.getId()));
+
+  }
+
+  /**
+   * One of those tasks as the cockpit addresses it. The workflow is the called instance rather
+   * than the business case, because that is what a reference built by the extension carries for
+   * a task of a called process.
+   */
+  private UserTaskReference signingReferenceOf(
+      final TestAggregate aggregate,
+      final Task task) {
+
+    return new UserTaskReference(
+        "c7", MODULE_ID, TestWorkflowService.CALLED_SIGN_PROCESS_ID, TestWorkflowService.DEPLOYED_VERSION, String
+            .valueOf(aggregate.getId()), task.getProcessInstanceId(), task
+                .getId(), TestWorkflowService.CALLER_SIGN_TASK_DEFINITION, TestWorkflowService.CALLER_SIGN_TASK_ID);
+
+  }
+
+  /** The reports of the two signing tasks of the called process. */
+  private List<String> awaitTheSigningOfTheCaller() {
+
+    final var deadline = System.currentTimeMillis() + 30000;
+    while (System.currentTimeMillis() < deadline) {
+      final var reported = CockpitServer
+          .matching("/usertask/created")
+          .stream()
+          .map(CockpitServer.Request::body)
+          .filter(
+              body -> body
+                  .contains(
+                      "\"taskDefinition\":\"%s\""
+                          .formatted(TestWorkflowService.CALLER_SIGN_TASK_DEFINITION)))
+          .toList();
+      if (reported.size() >= 2) {
+        return reported;
+      }
+      sleep();
+    }
+    throw new AssertionError(
+        "Fewer than two signing tasks were reported: %s"
+            .formatted(CockpitServer.received().stream().map(CockpitServer.Request::path).toList()));
 
   }
 
