@@ -38,3 +38,4 @@ vanillabp:
         ui-uri-path: /remoteEntry.js
         i18n-languages: en
         bpmn-description-language: en
+        initiator-source: system
