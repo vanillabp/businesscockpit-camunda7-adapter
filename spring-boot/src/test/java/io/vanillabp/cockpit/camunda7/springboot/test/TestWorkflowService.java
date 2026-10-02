@@ -32,7 +32,9 @@ import io.vanillabp.spi.service.WorkflowService;
     secondaryBpmnProcesses = {
         @BpmnProcess(bpmnProcessId = TestWorkflowService.MULTI_INSTANCE_PROCESS_ID), @BpmnProcess(
             bpmnProcessId = TestWorkflowService.NO_FORM_KEY_PROCESS_ID), @BpmnProcess(
-                bpmnProcessId = TestWorkflowService.EXPRESSION_FORM_KEY_PROCESS_ID)
+                bpmnProcessId = TestWorkflowService.EXPRESSION_FORM_KEY_PROCESS_ID), @BpmnProcess(
+                    bpmnProcessId = TestWorkflowService.EXPRESSION_CALL_PROCESS_ID), @BpmnProcess(
+                        bpmnProcessId = TestWorkflowService.CALLED_SIGN_PROCESS_ID)
     })
 public class TestWorkflowService {
 
@@ -68,6 +70,28 @@ public class TestWorkflowService {
    * <code>&#64;TaskParam</code> of an enclosing scope is bound from.
    */
   public static final String ORDER_KIND_VARIABLE = "orderKind";
+
+  /** The BPMN process whose call activity names the process it calls in an expression. */
+  public static final String EXPRESSION_CALL_PROCESS_ID = "ExpressionCallProcess";
+
+  /** The BPMN process that call activity calls. */
+  public static final String CALLED_SIGN_PROCESS_ID = "CalledSignProcess";
+
+  /**
+   * The BPMN element of the call activity, which is the only multi-instance element of that
+   * pair. It sits in the CALLING model, so the user task of the called process reports a level
+   * its own model does not carry.
+   */
+  public static final String CALL_ACTIVITY_ELEMENT = "EC_Call";
+
+  /** The form key of the user task of the called process. */
+  public static final String CALLER_SIGN_TASK_DEFINITION = "callerSign";
+
+  /** The BPMN element id of that user task. */
+  public static final String CALLER_SIGN_TASK_ID = "CS_Sign";
+
+  /** The variable the call activity reads the process to call from. */
+  public static final String CALLED_PROCESS_VARIABLE = "calledProcess";
 
   /** A BPMN process whose user task carries no form key at all. */
   public static final String NO_FORM_KEY_PROCESS_ID = "NoFormKeyProcess";
@@ -223,6 +247,41 @@ public class TestWorkflowService {
                     "signerVariable", String.valueOf(signerVariable), "orderKind", String
                         .valueOf(orderKind)));
     return prefilled;
+
+  }
+
+  /**
+   * The user task of the called process, as the COCKPIT shows it. Its parameters name the call
+   * activity of the CALLING model, which is where the only iteration of this pair sits, so the
+   * bridge has to have crossed that call activity for them to be answered at all. A level the
+   * bridge does not report is no missing value here: naming one which was not supplied ends the
+   * report, and with it the transaction creating the task.
+   *
+   * @param prefilled What the engine reported about the task
+   * @param signer The item of the round the caller is in
+   * @param index Which round that is
+   * @param total How many rounds the caller runs
+   * @return The enriched details
+   */
+  @UserTaskDetailsProvider(taskDefinition = CALLER_SIGN_TASK_DEFINITION)
+  public UserTaskDetails callerSign(
+      final PrefilledUserTaskDetails prefilled,
+      @MultiInstanceElement(CALL_ACTIVITY_ELEMENT) final String signer,
+      @MultiInstanceIndex(CALL_ACTIVITY_ELEMENT) final int index,
+      @MultiInstanceTotal(CALL_ACTIVITY_ELEMENT) final int total) {
+
+    prefilled.setDetails(Map.of("callerRound", levelAsText(signer, index, total)));
+    return prefilled;
+
+  }
+
+  /** One round in one string, so that two answers about it are compared as one value. */
+  private static String levelAsText(
+      final Object item,
+      final Object index,
+      final Object total) {
+
+    return "%s#%s/%s".formatted(item, index, total);
 
   }
 

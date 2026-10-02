@@ -328,7 +328,9 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         .dueDate(atOffset(task.getDueDate()))
         .followUpDate(atOffset(task.getFollowUpDate()))
         .variables(task.getVariables())
-        .multiInstances(multiInstancesOf(Camunda7MultiInstances.of(task.getExecution())))
+        .multiInstances(
+            multiInstancesOf(
+                Camunda7MultiInstances.of(task.getExecution(), engineFacts.taskRegistry())))
         .build();
 
   }
@@ -386,7 +388,10 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         .dueDate(atOffset(task.getDueDate()))
         .followUpDate(atOffset(task.getFollowUpDate()))
         .variables(variablesOf(task.getId()))
-        .multiInstances(multiInstancesOf(Camunda7MultiInstances.of(engine, task.getExecutionId())))
+        .multiInstances(
+            multiInstancesOf(
+                Camunda7MultiInstances
+                    .of(engine, task.getExecutionId(), engineFacts.taskRegistry())))
         .build();
 
   }
@@ -578,6 +583,17 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
     * The walk itself belongs to the Camunda 7 adapter. It reads the execution tree, which is the
     * engine knowledge a Camunda upgrade is most likely to invalidate, and the adapter does it for
     * its own task deliveries anyway.
+   * <p>
+    * Both calls of it hand over the task registry of this engine. The walk needs it for a call
+    * activity which names the process it calls in an expression: nothing was written onto such a
+    * call activity while the model was deployed, so the question whether the called process
+    * continues the caller's business case is asked while the workflow runs. Without the registry
+    * the walk ends there, so the cockpit names no round at all for a task of such a called
+    * process, and a details provider asking for one is refused while the task is created. Both
+    * ways into this class hand the registry over, because a task read off the engine has to say
+    * what reporting its creation said. Measured by
+    * {@code Camunda7CockpitTest#theLevelOfACallerReachesTheCockpit} and
+    * {@code Camunda7CockpitTest#theLevelOfACallerIsAnsweredWhenTheTaskIsRead}.
    * <p>
     * What is left here is a copy from one record into another. The adapter answers what a BPMS
     * reports about a task, and the platform's handler layer takes what a call into application
