@@ -45,21 +45,8 @@ public class Camunda7ProcessVersionTest {
   private static final String MODEL = "c7-cockpit/processes/cockpit-process.bpmn";
 
   @RegisterExtension
-  static final QuarkusExtensionTest extensionTest = new QuarkusExtensionTest()
-      .withApplicationRoot(
-          jar -> jar
-              .addAsResource("business-cockpit-versions.yaml", "application.yaml")
-              .addAsResource(MODEL)
-              .addAsResource(
-                  "workflow-module-descriptor/workflow-module", "META-INF/workflow-module")
-              .addClass(TestAggregate.class)
-              .addClass(TestAggregatePersistence.class)
-              .addClass(TestWorkflowService.class)
-              // this test class is initialized twice, once while the application is built
-              // and again inside the class loader of the running application. The copy
-              // inside that application needs the server class as well, or the assertions
-              // run against a class nobody loaded there
-              .addClass(CockpitServer.class))
+  static final QuarkusExtensionTest extensionTest = TestApplication
+      .forTestClass(Camunda7ProcessVersionTest.class, "business-cockpit-versions.yaml")
       .overrideRuntimeConfigKey(
           "vanillabp.cockpit.rest.base-url", CockpitServer.baseUrl());
 
