@@ -251,3 +251,56 @@ historic task instances any more, and its candidates are not replayed from the i
 of its end was built while the task was still there, and a question of the application is about a
 task which is running. Nothing else ever read them, so an engine which writes no task history runs
 this extension fine, and the boot check of decision 8 asks for the process-instance events alone.
+
+## 11. Every wait for a report names the case it is about
+
+Decided on 2026-10-03.
+
+No test of this repository waits for the next report on a collecting path any more. A wait on
+`/usertask/created` or `/workflow/created` names the business key of the case it is about, which is
+what every report of that case carries and no other report does. Nine waits were on such a path,
+and the cockpit server of the test refuses them from now on.
+
+Why:
+
+Every test of a module reports into one server, and the dispatch of an outbox entry outlives the
+test which caused it. A report of an earlier test therefore arrives on a collecting path at any
+moment, and a wait which takes the next report of its kind is satisfied by it. The test then walks
+on although nothing it provoked has happened yet. Four of these nine had a `forgetRequests()`
+behind them, three of them on the very next line, and that forget threw away the report the test
+had really been waiting for.
+
+The find came out of the Process-Engine-API adapter, where eight waits had the same shape. This
+repository was measured afterwards and had nine.
+
+What a wait names here:
+
+`Camunda7CockpitTest` already had the idiom, as a local named `thisCase`:
+
+```java
+"\"businessId\":\"%s\"".formatted(aggregate.getId())
+```
+
+It is a method now, `reportsOf(aggregate)`, so the class says it once instead of nine times. The
+business key answers for both paths, because the report of a user task carries the key of its case
+as well.
+
+`Camunda7TwoAdapterIdsTest` kept the started case in a variable to be able to name it. It started
+one and threw the result away.
+
+What stays:
+
+The `forgetRequests()` calls stay where they are. A test which provokes two reports about the same
+case tells them apart by waiting for the first, forgetting it and waiting again, and the
+identifier alone cannot do that. Only the wait in front of such a forget was wrong.
+
+The other `awaitAnyRequest` calls stay as they are: they wait on `/usertask/<id>/completed`,
+`/workflow/<id>/cancelled` and the like, and only the case under test can report there.
+
+Where this is referred to, each in its own words rather than by number:
+
+- `spring-boot/.../Camunda7CockpitTest.java`: 8 waits and the `reportsOf` method
+- `spring-boot/.../Camunda7TwoAdapterIdsTest.java`: 1 wait
+- the decision log of `business-cockpit`: why the cockpit server refuses the wait instead
+  of trusting the next test class to get it right
+
