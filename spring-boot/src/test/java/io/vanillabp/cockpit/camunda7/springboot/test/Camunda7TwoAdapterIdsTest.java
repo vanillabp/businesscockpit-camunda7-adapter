@@ -43,9 +43,7 @@ import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 @SpringBootTest(classes = {
     TestApplication.class, Camunda7TwoAdapterIdsTest.SecondEngineConfiguration.class
 }, properties = {
-    // a database of its own: contexts are cached and live in parallel, and another context's
-    // engine on the same H2 database would execute this one's jobs
-    "spring.datasource.url=jdbc:h2:mem:c7-cockpit-two-ids;DB_CLOSE_DELAY=-1", "vanillabp.prioritized-adapters=c7,c7b", "vanillabp.adapters.c7b.type=camunda7", "vanillabp.adapters.c7b.name-clash-avoidance=by-adapter", "vanillabp.adapters.c7b.data-source-name=c7bDataSource", "vanillabp.workflow-modules.c7-cockpit.adapters.c7b.resources-location=classpath*:c7-cockpit/processes"
+    "vanillabp.prioritized-adapters=c7,c7b", "vanillabp.adapters.c7b.type=camunda7", "vanillabp.adapters.c7b.name-clash-avoidance=by-adapter", "vanillabp.adapters.c7b.data-source-name=c7bDataSource", "vanillabp.workflow-modules.c7-cockpit.adapters.c7b.resources-location=classpath*:c7-cockpit/processes"
 })
 @ExtendWith(SuppressOutputExtension.class)
 @SuppressOutputExtension.SuppressBackgroundOutput

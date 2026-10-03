@@ -34,9 +34,7 @@ import io.vanillabp.integration.test.utils.SuppressOutputExtension;
  * extension reading the adapter's section alone cannot see.
  */
 @SpringBootTest(classes = TestApplication.class, properties = {
-    // a database of its own: the contexts of this repository's tests are cached and live in
-    // parallel, and another context's engine on the same H2 database would run this one's jobs
-    "spring.datasource.url=jdbc:h2:mem:c7-cockpit-module-tenant;DB_CLOSE_DELAY=-1", "vanillabp.workflow-modules.c7-cockpit.adapters.c7.tenant-id=a-tenant-of-its-own"
+    "vanillabp.workflow-modules.c7-cockpit.adapters.c7.tenant-id=a-tenant-of-its-own"
 })
 @ExtendWith(SuppressOutputExtension.class)
 @SuppressOutputExtension.SuppressBackgroundOutput

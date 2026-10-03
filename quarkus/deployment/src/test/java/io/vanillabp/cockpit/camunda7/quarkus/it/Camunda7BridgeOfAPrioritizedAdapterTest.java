@@ -30,16 +30,8 @@ import jakarta.inject.Inject;
 public class Camunda7BridgeOfAPrioritizedAdapterTest {
 
   @RegisterExtension
-  static final QuarkusExtensionTest extensionTest = new QuarkusExtensionTest()
-      .withApplicationRoot(
-          jar -> jar
-              .addAsResource("business-cockpit-prioritized-only.yaml", "application.yaml")
-              .addAsResource("c7-cockpit/processes/cockpit-process.bpmn")
-              .addAsResource(
-                  "workflow-module-descriptor/workflow-module", "META-INF/workflow-module")
-              .addClass(TestAggregate.class)
-              .addClass(TestAggregatePersistence.class)
-              .addClass(TestWorkflowService.class))
+  static final QuarkusExtensionTest extensionTest = TestApplication
+      .forTestClass(Camunda7BridgeOfAPrioritizedAdapterTest.class, "business-cockpit-prioritized-only.yaml")
       .overrideRuntimeConfigKey(
           "vanillabp.cockpit.rest.base-url", "http://localhost:1");
 

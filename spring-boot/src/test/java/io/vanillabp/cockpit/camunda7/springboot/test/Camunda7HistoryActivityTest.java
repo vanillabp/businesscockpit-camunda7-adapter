@@ -42,10 +42,6 @@ import io.vanillabp.integration.test.utils.SuppressOutputExtension;
  */
 @SpringBootTest(classes = {
     TestApplication.class, Camunda7HistoryActivityTest.AnEngineKeepingTheLeastThatWorks.class
-}, properties = {
-    // a database of its own: the contexts of this repository's tests are cached and live in
-    // parallel, and another context's engine on the same H2 database would run this one's jobs
-    "spring.datasource.url=jdbc:h2:mem:c7-cockpit-history-activity;DB_CLOSE_DELAY=-1"
 })
 @ExtendWith(SuppressOutputExtension.class)
 @SuppressOutputExtension.SuppressBackgroundOutput

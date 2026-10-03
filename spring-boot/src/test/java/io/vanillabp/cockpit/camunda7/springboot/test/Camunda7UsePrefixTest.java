@@ -33,9 +33,7 @@ import io.vanillabp.integration.test.utils.SuppressOutputExtension;
  * one workflow module with the tasks of that module alone.
  */
 @SpringBootTest(classes = TestApplication.class, properties = {
-    // a database of its own: the contexts of this repository's tests are cached and live in
-    // parallel, and another context's engine on the same H2 database would run this one's jobs
-    "spring.datasource.url=jdbc:h2:mem:c7-cockpit-use-prefix;DB_CLOSE_DELAY=-1", "vanillabp.adapters.c7.name-clash-avoidance=use-prefix"
+    "vanillabp.adapters.c7.name-clash-avoidance=use-prefix"
 })
 @ExtendWith(SuppressOutputExtension.class)
 @SuppressOutputExtension.SuppressBackgroundOutput

@@ -40,12 +40,7 @@ import io.vanillabp.integration.test.utils.SuppressOutputExtension;
  * a case on it. That is the half a single deployment cannot show: a version the application
  * reports has to follow the deployment rather than being the same number forever.
  */
-@SpringBootTest(classes = TestApplication.class,
-    properties = {
-        // an engine and an outbox of its own. This class deploys a second generation of the
-        // model, and every other class of this repository tests what one deployment does
-        "spring.datasource.url=jdbc:h2:mem:c7-cockpit-versions;DB_CLOSE_DELAY=-1"
-    })
+@SpringBootTest(classes = TestApplication.class)
 @ExtendWith(SuppressOutputExtension.class)
 @SuppressOutputExtension.SuppressBackgroundOutput
 // closed when the class is done: an engine outliving its test keeps its job executor running
