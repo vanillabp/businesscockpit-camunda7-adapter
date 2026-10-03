@@ -192,6 +192,21 @@ public class Camunda7CockpitTest {
 
   }
 
+  /**
+   * What the reports of one case carry and the reports of every other case do not. The paths
+   * {@code /workflow/created} and {@code /usertask/created} are shared by every case, so a wait
+   * on one of them has to say which case it is about.
+   *
+   * @param aggregate The case under test
+   * @return What a report of that case carries
+   */
+  private static String reportsOf(
+      final TestAggregate aggregate) {
+
+    return "\"businessId\":\"%s\"".formatted(aggregate.getId());
+
+  }
+
   private String userTaskIdOf(
       final TestAggregate aggregate) {
 
@@ -245,7 +260,7 @@ public class Camunda7CockpitTest {
     // both reports are awaited by the id of this case: '/workflow/created' and
     // '/usertask/created' are paths every case reports on, so waiting on the path alone
     // takes whichever report arrived first and asserts against a case nobody asked about
-    final var thisCase = "\"businessId\":\"%s\"".formatted(aggregate.getId());
+    final var thisCase = reportsOf(aggregate);
 
     final var workflow = CockpitServer.awaitRequest("/workflow/created", thisCase);
     assertTrue(workflow.body().contains("\"customer\":\"Anna\""), workflow.body());
@@ -275,7 +290,7 @@ public class Camunda7CockpitTest {
 
     final var aggregate = aStartedWorkflow("Bert");
     final var userTaskId = userTaskIdOf(aggregate);
-    CockpitServer.awaitAnyRequest("/usertask/created");
+    CockpitServer.awaitRequestOf("/usertask/created", reportsOf(aggregate));
 
     final var workflowId = workflowIdOf(aggregate);
 
@@ -294,7 +309,7 @@ public class Camunda7CockpitTest {
 
     final var aggregate = aStartedWorkflow("Cleo");
     final var userTaskId = userTaskIdOf(aggregate);
-    CockpitServer.awaitAnyRequest("/usertask/created");
+    CockpitServer.awaitRequestOf("/usertask/created", reportsOf(aggregate));
 
     final var workflowId = workflowIdOf(aggregate);
     engine.getRuntimeService().deleteProcessInstance(workflowId, "the test cancelled it");
@@ -310,7 +325,7 @@ public class Camunda7CockpitTest {
 
     final var aggregate = aStartedWorkflow("Dora");
     final var userTaskId = userTaskIdOf(aggregate);
-    CockpitServer.awaitAnyRequest("/usertask/created");
+    CockpitServer.awaitRequestOf("/usertask/created", reportsOf(aggregate));
     CockpitServer.forgetRequests();
 
     // nothing of VanillaBP is involved here: this is what a task list or the Camunda web
@@ -328,7 +343,7 @@ public class Camunda7CockpitTest {
 
     final var aggregate = aStartedWorkflow("Emil");
     userTaskIdOf(aggregate);
-    CockpitServer.awaitAnyRequest("/workflow/created");
+    CockpitServer.awaitRequestOf("/workflow/created", reportsOf(aggregate));
     final var workflowId = workflowIdOf(aggregate);
     CockpitServer.forgetRequests();
 
@@ -353,7 +368,7 @@ public class Camunda7CockpitTest {
 
     final var aggregate = aStartedWorkflow("Frida");
     final var userTaskId = userTaskIdOf(aggregate);
-    CockpitServer.awaitAnyRequest("/usertask/created");
+    CockpitServer.awaitRequestOf("/usertask/created", reportsOf(aggregate));
     CockpitServer.forgetRequests();
 
     changeTheCase(
@@ -403,7 +418,7 @@ public class Camunda7CockpitTest {
 
     final var aggregate = aStartedWorkflow("Ida");
     final var userTaskId = userTaskIdOf(aggregate);
-    CockpitServer.awaitAnyRequest("/usertask/created");
+    CockpitServer.awaitRequestOf("/usertask/created", reportsOf(aggregate));
     CockpitServer.forgetRequests();
 
     transactions
@@ -843,7 +858,7 @@ public class Camunda7CockpitTest {
 
     final var aggregate = aStartedWorkflow("Quirin");
     final var userTaskId = userTaskIdOf(aggregate);
-    CockpitServer.awaitAnyRequest("/usertask/created");
+    CockpitServer.awaitRequestOf("/usertask/created", reportsOf(aggregate));
 
     // the first attempt is refused, so this report leaves the application after the engine
     // changed the task and finished with it. Whenever the outbox gets to it, it says what the
@@ -1027,7 +1042,7 @@ public class Camunda7CockpitTest {
 
     final var aggregate = aStartedWorkflow("Olga");
     final var userTaskId = userTaskIdOf(aggregate);
-    CockpitServer.awaitAnyRequest("/usertask/created");
+    CockpitServer.awaitRequestOf("/usertask/created", reportsOf(aggregate));
 
     final var workflowId = workflowIdOf(aggregate);
     // what the Camunda web application does when an operator deletes a case: the listeners of

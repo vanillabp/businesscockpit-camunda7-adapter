@@ -133,14 +133,17 @@ public class Camunda7TwoAdapterIdsTest {
 
     CockpitServer.forgetRequests();
 
-    transactions
+    final var started = transactions
         .execute(status -> {
           final var aggregate = new TestAggregate();
           aggregate.setCustomer("Nora");
           return workflowService.processes().startWorkflow(aggregate);
         });
 
-    CockpitServer.awaitAnyRequest("/usertask/created");
+    // the two paths below are shared by every case, so the wait says which case it is about
+    CockpitServer
+        .awaitRequestOf(
+            "/usertask/created", "\"businessId\":\"%s\"".formatted(started.getId()));
     CockpitServer.awaitQuiet();
 
     assertEquals(
