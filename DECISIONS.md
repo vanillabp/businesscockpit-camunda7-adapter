@@ -303,3 +303,4 @@ Where this is referred to, each in its own words rather than by number:
 - `spring-boot/.../Camunda7TwoAdapterIdsTest.java`: 1 wait
 - the decision log of `business-cockpit`: why the cockpit server refuses the wait instead
   of trusting the next test class to get it right
+
