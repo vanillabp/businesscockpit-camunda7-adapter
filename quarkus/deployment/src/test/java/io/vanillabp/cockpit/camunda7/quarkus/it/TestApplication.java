@@ -1,5 +1,9 @@
 package io.vanillabp.cockpit.camunda7.quarkus.it;
 
+import java.util.function.Consumer;
+
+import org.jboss.shrinkwrap.api.spec.JavaArchive;
+
 import io.quarkus.test.QuarkusExtensionTest;
 import io.vanillabp.cockpit.extension.test.support.CockpitServer;
 
@@ -38,9 +42,27 @@ public final class TestApplication {
       final Class<?> testClass,
       final String configuration) {
 
+    return forTestClass(testClass, configuration, jar -> {
+    });
+
+  }
+
+  /**
+   * @param testClass     The test class which boots the application
+   * @param configuration The configuration file of the test, which becomes the application's
+   *                      <code>application.yaml</code>
+   * @param more          What this test class adds to the application, like a workflow
+   *                      service of a scenario of its own
+   * @return The application, with a database named after the test class
+   */
+  public static QuarkusExtensionTest forTestClass(
+      final Class<?> testClass,
+      final String configuration,
+      final Consumer<JavaArchive> more) {
+
     return new QuarkusExtensionTest()
         .withApplicationRoot(
-            jar -> jar
+            jar -> more.accept(jar
                 .addAsResource(configuration, "application.yaml")
                 .addAsResource("c7-cockpit/processes/cockpit-process.bpmn")
                 .addAsResource(
@@ -53,7 +75,7 @@ public final class TestApplication {
                 // calls this class, and its assertions use the server class, so the copy inside
                 // that application needs both
                 .addClass(TestApplication.class)
-                .addClass(CockpitServer.class))
+                .addClass(CockpitServer.class)))
         .overrideConfigKey(DATABASE_NAME_KEY, testClass.getSimpleName());
 
   }

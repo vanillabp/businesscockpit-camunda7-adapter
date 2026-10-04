@@ -3,10 +3,15 @@ package io.vanillabp.cockpit.camunda7;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.Date;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 import org.camunda.bpm.engine.delegate.DelegateTask;
+import org.camunda.bpm.engine.impl.context.Context;
 import org.camunda.bpm.engine.impl.history.event.HistoricProcessInstanceEventEntity;
+import org.camunda.bpm.engine.impl.interceptor.CommandContext;
+import org.camunda.bpm.engine.impl.interceptor.CommandContextListener;
 import org.camunda.bpm.engine.impl.persistence.entity.ExecutionEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,6 +59,13 @@ public class Camunda7CockpitEvents {
   private final Supplier<BusinessCockpitEventPublisher> publisher;
 
   private final Supplier<EventTransaction> transaction;
+
+  /**
+   * The starts of process instances which had no name yet, by the id of the instance, with the
+   * moment each one started. An entry lives for as long as the engine command which started the
+   * instance: see {@link #rememberTheStartOfAnUnnamedWorkflow}.
+   */
+  private final Map<String, Date> startsWaitingForTheirName = new ConcurrentHashMap<>();
 
   /**
    * @param scope The engine these events come from
@@ -176,12 +188,27 @@ public class Camunda7CockpitEvents {
     }
     final var workflowAggregateId = event.getBusinessKey();
     if (workflowAggregateId == null) {
+      if (kind == WorkflowEventKind.CREATED) {
+        rememberTheStartOfAnUnnamedWorkflow(event);
+      }
       logger
           .debug(
               "Camunda7[{}]: not reporting workflow '{}' of BPMN process '{}': the process instance carries no business key, so there is no workflow aggregate to report it for",
               scope.adapterId(), event.getProcessInstanceId(), process.get().bpmnProcessId());
       return;
     }
+
+    // the update which gives a workflow its first name, after a start nobody could report, is
+    // the start of the case for the cockpit, with the moment the instance started
+    final var startWaitingForThisName = kind == WorkflowEventKind.UPDATED
+        ? startsWaitingForTheirName.remove(event.getProcessInstanceId())
+        : null;
+    final var reportedKind = startWaitingForThisName == null
+        ? kind
+        : WorkflowEventKind.CREATED;
+    final var timestamp = startWaitingForThisName == null
+        ? timestampOf(event, kind)
+        : atOffset(startWaitingForThisName);
 
     final var reference = new WorkflowReference(
         scope.adapterId(), process.get().workflowModuleId(), process.get()
@@ -195,7 +222,58 @@ public class Camunda7CockpitEvents {
             () -> publisher
                 .get()
                 .publishWorkflowEvent(
-                    reference, kind, event.getId(), timestampOf(event, kind), transaction()));
+                    reference, reportedKind, event.getId(), timestamp, transaction()));
+
+  }
+
+  /**
+   * A workflow which the engine started by itself has no name at its start. A timer, a signal or
+   * a message correlated past VanillaBP starts the process instance without a business key, and
+   * the Camunda 7 adapter writes the name into it a moment later, once the application has built
+   * the workflow aggregate. For the engine that is a change of the process instance, so the next
+   * event about it is an update. This remembers the start, and the update which brings the name
+   * is reported as the start of the case.
+   * <p>
+   * The name arrives in the same engine command, while the listener of the start event runs. So
+   * the entry is dropped when that command ends, whether a name arrived or not. A start which
+   * never gets a name is no case of the cockpit, and a later update is a real update.
+   *
+   * @param event The history event of the start
+   */
+  private void rememberTheStartOfAnUnnamedWorkflow(
+      final HistoricProcessInstanceEventEntity event) {
+
+    final var commandContext = Context.getCommandContext();
+    if (commandContext == null) {
+      // there is no command whose end would drop the entry again
+      return;
+    }
+    final var processInstanceId = event.getProcessInstanceId();
+    startsWaitingForTheirName
+        .put(
+            processInstanceId, event.getStartTime() == null
+                ? new Date()
+                : event.getStartTime());
+    commandContext.registerCommandContextListener(new CommandContextListener() {
+
+      @Override
+      public void onCommandContextClose(
+          final CommandContext closed) {
+
+        startsWaitingForTheirName.remove(processInstanceId);
+
+      }
+
+      @Override
+      public void onCommandFailed(
+          final CommandContext failed,
+          final Throwable cause) {
+
+        startsWaitingForTheirName.remove(processInstanceId);
+
+      }
+
+    });
 
   }
 
