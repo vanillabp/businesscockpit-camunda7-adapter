@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" id="SignalStartedDefinitions" targetNamespace="http://vanillabp.io/businesscockpit/camunda7">
+  <!-- a workflow nobody starts through VanillaBP: a broadcast signal starts it, so the
+       instance arrives without a business key, and the application names it in its
+       @WorkflowStartedByBpms method. The user task keeps it running, so that the start is the
+       only thing the cockpit is told about it. -->
+  <bpmn:signal id="CockpitStartSignal" name="cockpitStartSignal" />
+  <bpmn:process id="SignalStartedProcess" isExecutable="true">
+    <bpmn:startEvent id="SS_Start">
+      <bpmn:outgoing>SS_ToApprove</bpmn:outgoing>
+      <bpmn:signalEventDefinition signalRef="CockpitStartSignal" />
+    </bpmn:startEvent>
+    <bpmn:sequenceFlow id="SS_ToApprove" sourceRef="SS_Start" targetRef="SS_Approve" />
+    <bpmn:userTask id="SS_Approve" name="Approve the signalled order" camunda:formKey="approveSignalled">
+      <bpmn:incoming>SS_ToApprove</bpmn:incoming>
+      <bpmn:outgoing>SS_ToEnd</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="SS_ToEnd" sourceRef="SS_Approve" targetRef="SS_End" />
+    <bpmn:endEvent id="SS_End">
+      <bpmn:incoming>SS_ToEnd</bpmn:incoming>
+    </bpmn:endEvent>
+  </bpmn:process>
+</bpmn:definitions>

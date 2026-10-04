@@ -1,9 +1,8 @@
-spring:
+quarkus:
   datasource:
-    url: "jdbc:h2:mem:${c7-cockpit.test.database-name};DB_CLOSE_DELAY=-1"
-  jpa:
-    hibernate:
-      ddl-auto: create
+    db-kind: h2
+    jdbc:
+      url: "jdbc:h2:mem:${c7-cockpit.test.database-name};DB_CLOSE_DELAY=-1"
 vanillabp:
   outbox:
     poll-interval: PT0.2S
@@ -14,28 +13,17 @@ vanillabp:
       name-clash-avoidance: by-adapter
   prioritized-adapters:
     - c7
-  cockpit:
-    rest:
-      base-url: replaced-by-the-test
   workflow-modules:
     c7-cockpit:
       adapters:
         c7:
-          resources-location: classpath*:c7-cockpit/processes
+          resources-location: classpath:c7-cockpit/processes
       workflows:
         CockpitProcess:
           allow-full-sync-with-bpms: true
           declared-aggregate-values:
             - signers
         MultiInstanceProcess:
-          allow-full-sync-with-bpms: true
-          declared-aggregate-values:
-            - signers
-        NoFormKeyProcess:
-          allow-full-sync-with-bpms: true
-          declared-aggregate-values:
-            - signers
-        ExpressionFormKeyProcess:
           allow-full-sync-with-bpms: true
           declared-aggregate-values:
             - signers
