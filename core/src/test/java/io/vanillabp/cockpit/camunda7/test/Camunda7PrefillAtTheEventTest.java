@@ -76,6 +76,9 @@ public class Camunda7PrefillAtTheEventTest {
 
   private static final String TASK_ID = "the-task";
 
+  /** When the task of the event was created, and when the case of the event was started. */
+  private static final Date THE_START = new Date(1_700_000_000_000L);
+
   private Camunda7EventBeingReported eventBeingReported;
 
   private Camunda7CockpitBridge bridge;
@@ -147,6 +150,7 @@ public class Camunda7PrefillAtTheEventTest {
     when(task.getName()).thenReturn("Approve the order");
     when(task.getAssignee()).thenReturn("anna");
     when(task.getDueDate()).thenReturn(new Date());
+    when(task.getCreateTime()).thenReturn(THE_START);
     when(task.getVariables()).thenReturn(Map.of("customer", "Anna"));
     when(task.getCandidates())
         .thenReturn(
@@ -197,7 +201,7 @@ public class Camunda7PrefillAtTheEventTest {
     event.setProcessDefinitionKey(BPMN_PROCESS_ID);
     event.setProcessDefinitionName("A process with a name");
     event.setBusinessKey("4711");
-    event.setStartTime(new Date());
+    event.setStartTime(THE_START);
     return event;
 
   }
@@ -232,6 +236,7 @@ public class Camunda7PrefillAtTheEventTest {
           assertEquals(List.of("approvers"), prefill.candidateGroups());
           assertEquals(List.of("bert"), prefill.candidateUsers());
           assertEquals(Map.of("customer", "Anna"), prefill.variables());
+          assertEquals(THE_START.toInstant(), prefill.createdAt().toInstant());
         });
 
     verify(taskService, never()).createTaskQuery();
@@ -254,6 +259,29 @@ public class Camunda7PrefillAtTheEventTest {
           assertEquals("4711", prefill.businessId());
           assertEquals("anna", prefill.initiator());
         });
+
+  }
+
+  @Test
+  @DisplayName("The end of a workflow says when it was started, and an event without a start time says nothing")
+  public void theEndOfAWorkflowSaysWhenItWasStarted() {
+
+    final var ended = anInstanceEvent(HistoryEventTypes.PROCESS_INSTANCE_END);
+    eventBeingReported
+        .whileReporting(
+            ended,
+            () -> assertEquals(
+                THE_START.toInstant(),
+                bridge.prefilledWorkflowDetails(aReferenceTo()).orElseThrow().createdAt().toInstant()));
+
+    final var withoutAStart = anInstanceEvent(HistoryEventTypes.PROCESS_INSTANCE_END);
+    withoutAStart.setStartTime(null);
+    eventBeingReported
+        .whileReporting(
+            withoutAStart,
+            () -> assertNull(
+                bridge.prefilledWorkflowDetails(aReferenceTo()).orElseThrow().createdAt(),
+                "an event without a start time was reported with one"));
 
   }
 

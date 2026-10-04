@@ -298,6 +298,9 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
     * records who started a case in the history of the process instance, so a user task never
     * carried it without a second query, and at the moment of an event no query reaches it at
     * all. Nothing else is put there instead - see decision 10 in the repository's DECISIONS.md.
+   * <p>
+    * The task also says when it was created. The cockpit reads that only from the report of an
+    * end, for an end which arrives before the creation did.
    *
    * @param task The task of the listener
    * @param bpmnProcessId The BPMN process as the application wrote it, the fallback for a model
@@ -327,6 +330,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         .candidateGroups(candidates.groups())
         .dueDate(atOffset(task.getDueDate()))
         .followUpDate(atOffset(task.getFollowUpDate()))
+        .createdAt(atOffset(task.getCreateTime()))
         .variables(task.getVariables())
         .multiInstances(
             multiInstancesOf(
@@ -342,6 +346,11 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
     * carries who started the case. An end event does not repeat who started it, so the report of
     * an end leaves that empty and the cockpit keeps what the creation told it.
     * See decision 10 in the repository's DECISIONS.md.
+   * <p>
+    * The cockpit needs the start of the case where the end arrives before the creation did. The
+    * engine writes the start time only into the event of the start, and the event of an end has
+    * it only where the case ended in the command that started it. Any other end would need a
+    * read of the history, so its report leaves the start empty.
    *
    * @param event The history event of the process instance
    * @param bpmnProcessId The BPMN process as the application wrote it, the fallback for a model
@@ -355,7 +364,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
     return new WorkflowDetailsPrefill(
         versionOf(event.getProcessDefinitionId()), event.getBusinessKey(), (name == null) || name.isBlank()
             ? bpmnProcessId
-            : name, event.getStartUserId());
+            : name, event.getStartUserId(), atOffset(event.getStartTime()));
 
   }
 
