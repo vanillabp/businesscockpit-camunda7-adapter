@@ -3,13 +3,15 @@ package io.vanillabp.cockpit.camunda7.springboot.test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -250,6 +252,35 @@ public class Camunda7CockpitTest {
 
   }
 
+  /**
+   * When a report says its user task was created. Only the report of an end carries it.
+   *
+   * @param report The report as the cockpit server received it
+   * @return The time the report names, as an instant
+   */
+  private static Instant startNamedBy(
+      final CockpitServer.Request report) {
+
+    final var createdAt = Pattern.compile("\"createdAt\":\"([^\"]+)\"").matcher(report.body());
+    assertTrue(createdAt.find(), "the report of an end did not say when its task was created: "
+        + report.body());
+    return OffsetDateTime.parse(createdAt.group(1)).toInstant();
+
+  }
+
+  /**
+   * When the engine created a user task, read before the end.
+   *
+   * @param userTaskId The user task
+   * @return The time of its creation
+   */
+  private Instant creationOf(
+      final String userTaskId) {
+
+    return engine.getTaskService().createTaskQuery().taskId(userTaskId).singleResult().getCreateTime().toInstant();
+
+  }
+
   @Test
   @DisplayName("A started workflow and its user task reach the cockpit, enriched by the application")
   public void aStartedWorkflowReachesTheCockpit() {
@@ -294,12 +325,17 @@ public class Camunda7CockpitTest {
 
     final var workflowId = workflowIdOf(aggregate);
 
+    final var created = creationOf(userTaskId);
     engine.getTaskService().complete(userTaskId);
 
-    assertNotNull(
-        CockpitServer.awaitAnyRequest("/usertask/%s/completed".formatted(userTaskId)));
-    assertNotNull(
-        CockpitServer.awaitAnyRequest("/workflow/%s/completed".formatted(workflowId)));
+    // the report of an end says when its task was created, for the cockpit which gets the end
+    // before the creation
+    final var task = CockpitServer.awaitAnyRequest("/usertask/%s/completed".formatted(userTaskId));
+    assertEquals(created, startNamedBy(task), task.body());
+    final var workflow = CockpitServer.awaitAnyRequest("/workflow/%s/completed".formatted(workflowId));
+    // the end of a case says nothing about its start. The engine writes the start time only into
+    // the event of the start, and this end comes in a command of its own
+    assertTrue(workflow.body().contains("\"createdAt\":null"), workflow.body());
 
   }
 
@@ -312,10 +348,15 @@ public class Camunda7CockpitTest {
     CockpitServer.awaitRequestOf("/usertask/created", reportsOf(aggregate));
 
     final var workflowId = workflowIdOf(aggregate);
+    final var created = creationOf(userTaskId);
     engine.getRuntimeService().deleteProcessInstance(workflowId, "the test cancelled it");
 
-    CockpitServer.awaitAnyRequest("/usertask/%s/cancelled".formatted(userTaskId));
-    CockpitServer.awaitAnyRequest("/workflow/%s/cancelled".formatted(workflowId));
+    final var task = CockpitServer.awaitAnyRequest("/usertask/%s/cancelled".formatted(userTaskId));
+    assertEquals(created, startNamedBy(task), task.body());
+    final var workflow = CockpitServer.awaitAnyRequest("/workflow/%s/cancelled".formatted(workflowId));
+    // the end of a case says nothing about its start. The engine writes the start time only into
+    // the event of the start, and this end comes in a command of its own
+    assertTrue(workflow.body().contains("\"createdAt\":null"), workflow.body());
 
   }
 
