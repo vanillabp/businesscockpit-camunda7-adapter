@@ -304,3 +304,44 @@ Where this is referred to, each in its own words rather than by number:
 - the decision log of `business-cockpit`: why the cockpit server refuses the wait instead
   of trusting the next test class to get it right
 
+## 12. A workflow which gets its first name is reported as created, with the moment it started
+
+Decided on 2026-10-04 for story 1440. Before, such a workflow reached the cockpit as an update.
+
+Related entries: 3 (a workflow's lifecycle is read from the engine's history) and 10 (the report is
+built at the event). This entry adds to 3 and changes neither of them.
+
+A timer, a signal or a message correlated past VanillaBP starts a process instance without a
+business key. The engine writes the start into its history at once, and the history event carries
+no business key. The extension has no workflow aggregate to report it for, so it skips it.
+
+The Camunda 7 adapter then asks the application to build the aggregate, in the listener of the
+start event, and writes the aggregate's id into the business key. The engine writes that as a
+change of the process instance. The extension reported it as `UPDATED`, with the clock of that
+moment as its time.
+
+`Camunda7BpmsStartedWorkflowTest` measured it on Spring Boot before the change. A signal start
+arrived once, as `/workflow/<id>/updated`, 11 milliseconds after the instance started. A start
+through `ProcessService` arrived once, as `/workflow/created`, at the moment the instance started.
+
+The cockpit server creates a case from a change it never saw created, which is decision 36 in
+`business-cockpit`. So the case was there, but it began at the time of the change.
+
+A start without a business key is remembered, with the moment it started. The next update of that
+instance which carries a business key is reported as `CREATED`, at the remembered moment. So the
+case arrives once, as created, like a case the application started.
+
+The memory lives as long as the engine command which started the instance. A listener on the
+command context drops the entry when the command ends or fails. The name arrives in that same
+command, so nothing more is needed. A start which never gets a name is no case of the cockpit. An
+update in a later command is a real update and stays `UPDATED`.
+
+Why not the other way, which waits with the start until the command ends? It would report the
+start late and still have to keep the update from being reported. That is the same memory, plus a
+report which is no longer built at its event, against decision 10.
+
+A modeller can put `camunda:asyncBefore` on a start event. The engine then writes the start in one
+transaction, and the listener of the start event runs later in a job. The name arrives in a
+different command, after the memory was dropped. Such a workflow still arrives as `UPDATED`, and
+the server creates the case at the time of the change, as before. Nothing in VanillaBP sets
+`asyncBefore` on a start event, so the case needs a model which asks for it.
