@@ -19,6 +19,16 @@ class Camunda7CockpitProcessor {
   private static final String FEATURE = "vanillabp-business-cockpit-camunda7";
 
   /**
+   * Quarkus builds the processor at build time to call its build steps. It keeps no state of
+   * its own.
+   */
+  Camunda7CockpitProcessor() {
+
+  }
+
+  /**
+   * Announces the extension and makes the runtime's producer a bean Quarkus keeps.
+   *
    * @param featureProducer Where the feature is announced, so that a booting application lists
    *          the extension
    * @return The producer class, as a bean nothing may remove

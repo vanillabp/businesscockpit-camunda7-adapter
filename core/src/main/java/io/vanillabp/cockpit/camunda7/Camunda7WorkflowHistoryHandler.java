@@ -28,6 +28,8 @@ public class Camunda7WorkflowHistoryHandler implements HistoryEventHandler {
   private final Camunda7CockpitEvents events;
 
   /**
+   * Builds the handler which reports the workflow events of one engine.
+   *
    * @param events Where the observed event is reported
    */
   public Camunda7WorkflowHistoryHandler(

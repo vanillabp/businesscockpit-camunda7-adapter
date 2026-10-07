@@ -27,6 +27,14 @@ import java.util.concurrent.CopyOnWriteArraySet;
 public class Camunda7WorkflowProcesses {
 
   /**
+   * Starts out empty. The wiring service fills it while the workflow modules are
+   * deployed.
+   */
+  public Camunda7WorkflowProcesses() {
+
+  }
+
+  /**
    * One BPMN process of one workflow module, named the way the application wrote it.
    *
    * @param workflowModuleId The workflow module

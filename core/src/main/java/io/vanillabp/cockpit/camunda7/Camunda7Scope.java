@@ -36,6 +36,8 @@ public final class Camunda7Scope {
   private final Supplier<Camunda7EngineFacts> engine;
 
   /**
+   * Builds the scope of one engine.
+   *
    * @param adapterId The configured adapter id whose engine this scope belongs to
    * @param scoping VanillaBP's name-clash avoidance
    * @param engine What the Camunda 7 adapter knows about that engine
@@ -52,6 +54,8 @@ public final class Camunda7Scope {
   }
 
   /**
+   * Tells which adapter id this scope belongs to.
+   *
    * @return The configured adapter id
    */
   public String adapterId() {
@@ -61,6 +65,8 @@ public final class Camunda7Scope {
   }
 
   /**
+   * Tells which Camunda tenant a workflow module uses on this engine.
+   *
    * @param workflowModuleId The workflow module
    * @return The Camunda tenant this module's processes live in, or <code>null</code> where the
    *         configured mode uses none
@@ -104,6 +110,8 @@ public final class Camunda7Scope {
   }
 
   /**
+   * Turns a BPMN process id into the key this engine stores the process under.
+   *
    * @param workflowModuleId The workflow module
    * @param bpmnProcessId The BPMN process id as the application wrote it
    * @return The process definition key the engine knows, which differs from the plain id only

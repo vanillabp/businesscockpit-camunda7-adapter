@@ -32,6 +32,8 @@ public class Camunda7CockpitWiring implements ExtensionWiringService<BpmnModelIn
   private final Camunda7WorkflowProcesses processes;
 
   /**
+   * Builds the wiring service. It writes every process it sees deployed into the given store.
+   *
    * @param processes Where the deployed processes are remembered
    */
   public Camunda7CockpitWiring(

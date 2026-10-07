@@ -223,6 +223,26 @@
             </annotationProcessorPaths>
           </configuration>
         </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-javadoc-plugin</artifactId>
+          <configuration>
+            <!-- the release parent runs javadoc with doclint 'all' in every build but lets
+                 warnings pass. Here a warning breaks the build, and most warnings are a
+                 comment nobody wrote. Whoever wires this adapter into an application reads
+                 this javadoc and has no other source, so a missing sentence is a real gap.
+                 The gaps were filled once; a build which lets a warning pass again would
+                 hide the next one behind a green check. -->
+            <failOnWarnings>true</failOnWarnings>
+            <!-- the Quarkus extension processor writes an accessor class next to every
+                 class with build steps, and generated code has no comments. Nobody reads
+                 it and it is never published, so it is left out here. This is the only
+                 exclude: every other one would be a hole in the check. -->
+            <sourceFileExcludes>
+              <sourceFileExclude>**/*$$accessor.java</sourceFileExclude>
+            </sourceFileExcludes>
+          </configuration>
+        </plugin>
       </plugins>
     </pluginManagement>
     <plugins>

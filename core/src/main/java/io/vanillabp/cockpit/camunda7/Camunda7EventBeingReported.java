@@ -31,6 +31,14 @@ import org.camunda.bpm.engine.impl.history.event.HistoricProcessInstanceEventEnt
 public final class Camunda7EventBeingReported {
 
   /**
+   * Starts out empty. Nothing is being reported until a listener calls one of the
+   * <code>whileReporting</code> methods.
+   */
+  public Camunda7EventBeingReported() {
+
+  }
+
+  /**
    * One event being reported. Exactly one of the two is set: a report is about a user task or
    * about a workflow, never about both.
    *
@@ -73,6 +81,8 @@ public final class Camunda7EventBeingReported {
   }
 
   /**
+   * Looks up the task of the event this thread is reporting right now.
+   *
    * @param userTaskId The task the bridge was asked about
    * @return The task of the event being reported, or empty where this thread reports no event
    *         about that task
@@ -91,6 +101,8 @@ public final class Camunda7EventBeingReported {
   }
 
   /**
+   * Looks up the workflow of the event this thread is reporting right now.
+   *
    * @param workflowId The workflow the bridge was asked about
    * @return The history event of the event being reported, or empty where this thread reports no
    *         event about that workflow

@@ -35,6 +35,16 @@ import jakarta.inject.Singleton;
 public class Camunda7CockpitProducer {
 
   /**
+   * Quarkus builds the bean to call the producers below. It keeps no state of its
+   * own.
+   */
+  public Camunda7CockpitProducer() {
+
+  }
+
+  /**
+   * Produces the one store of deployed processes of this application.
+   *
    * @return Which BPMN processes of which workflow modules this application deployed, shared
    *         by the wiring service filling it and by everything translating an engine's
    *         identifiers back
@@ -49,6 +59,8 @@ public class Camunda7CockpitProducer {
   }
 
   /**
+   * Produces this extension's wiring service.
+   *
    * @param processes The deployed processes
    * @return This extension's place in VanillaBP's deployment pipeline, taken for a workflow
    *         module which runs on Camunda 7 and for no other
