@@ -42,6 +42,9 @@ public class Camunda7UserTaskParseListener extends AbstractBpmnParseListener {
   private final Camunda7CockpitEvents events;
 
   /**
+   * Builds the parse listener which puts the task listeners on every user task of a deployed
+   * process.
+   *
    * @param events Where the listeners report what they observed
    */
   public Camunda7UserTaskParseListener(

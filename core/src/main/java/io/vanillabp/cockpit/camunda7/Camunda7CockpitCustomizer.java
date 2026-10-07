@@ -73,6 +73,9 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
   private final Map<String, Camunda7EngineFacts> enginesByAdapterId = new ConcurrentHashMap<>();
 
   /**
+   * Builds the one customizer which hooks the cockpit into every Camunda 7 engine of this
+   * application.
+   *
    * @param processes The deployed processes, shared with the wiring service which fills them
    * @param scoping VanillaBP's name-clash avoidance
    * @param engines What the Camunda 7 adapter knows about each of its engines, one entry per
@@ -250,6 +253,9 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
   }
 
   /**
+   * Gives the place where one engine puts the event it is reporting. There is one per adapter
+   * id, made on first use.
+   *
    * @param adapterId The configured adapter id
    * @return Where the event of that engine is put while its report is built. The bridge of the
    *         same adapter id takes it from there, which is what makes a report carry the state of
@@ -301,6 +307,9 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
   }
 
   /**
+   * Gives the scope of one engine. It is made on first use, and every later call gets the same
+   * one.
+   *
    * @param adapterId The configured adapter id
    * @return How that engine names what the extension asks it about. The bridge answering the
    *         cockpit's reads takes it from here, so the queries it sends and the events the
@@ -315,6 +324,8 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
   }
 
   /**
+   * Tells in which transaction one engine writes its outbox entries.
+   *
    * @param adapterId The configured adapter id
    * @return Which transaction the entries of that engine are written in - what the platform
    *         answered for it, and with it whether a rolled-back workflow can leave a report

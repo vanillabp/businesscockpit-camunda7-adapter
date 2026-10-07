@@ -72,6 +72,8 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
   private final ProcessEngine engine;
 
   /**
+   * Builds the bridge for one engine. Each configured adapter id gets a bridge of its own.
+   *
    * @param scope The engine this bridge serves
    * @param engineFacts What the Camunda 7 adapter knows about that engine
    * @param processes The deployed processes, to translate the engine's identifiers back

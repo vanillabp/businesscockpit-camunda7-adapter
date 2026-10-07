@@ -22,6 +22,8 @@ public class Camunda7UserTaskListener implements TaskListener {
   private final String taskDefinition;
 
   /**
+   * Builds the listener for one user task of one process.
+   *
    * @param events Where the observed event is reported
    * @param bpmnTaskId The BPMN element id of the user task this listener sits on
    * @param taskDefinition The task's form key, or its element id where it has none

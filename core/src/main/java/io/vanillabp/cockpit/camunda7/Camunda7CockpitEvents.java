@@ -68,6 +68,8 @@ public class Camunda7CockpitEvents {
   private final Map<String, Date> startsWaitingForTheirName = new ConcurrentHashMap<>();
 
   /**
+   * Builds the events of one engine.
+   *
    * @param scope The engine these events come from
    * @param processes The deployed processes, to translate the engine's identifiers back
    * @param eventBeingReported Where the event is put for as long as its report is built, shared
@@ -95,6 +97,8 @@ public class Camunda7CockpitEvents {
   }
 
   /**
+   * Tells which engine these events come from.
+   *
    * @return The engine these events come from
    */
   public Camunda7Scope scope() {
@@ -104,6 +108,8 @@ public class Camunda7CockpitEvents {
   }
 
   /**
+   * Tells in which transaction the outbox entry of an event is written.
+   *
    * @return Which transaction the outbox entry of an event is written in
    */
   public EventTransaction transaction() {

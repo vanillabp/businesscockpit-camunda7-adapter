@@ -36,6 +36,14 @@ import io.vanillabp.integration.adapter.AdapterBeanRegistrarSupport;
  */
 public class Camunda7CockpitBeanRegistrar implements BeanRegistrar {
 
+  /**
+   * Spring builds the registrar because the auto-configuration imports it. It keeps
+   * no state of its own.
+   */
+  public Camunda7CockpitBeanRegistrar() {
+
+  }
+
   @Override
   public void register(
       final BeanRegistry registry,

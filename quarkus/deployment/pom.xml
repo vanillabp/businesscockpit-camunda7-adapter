@@ -90,6 +90,15 @@
   <build>
     <plugins>
       <plugin>
+        <!-- the build steps are package private, as Quarkus wants them. Without this the
+             javadoc run finds no public class and stops with an error, and the one class a
+             reader of this module needs would not be checked at all -->
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <configuration>
+          <show>package</show>
+        </configuration>
+      </plugin>
+      <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
         <executions>
           <execution>
