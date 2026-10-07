@@ -160,6 +160,13 @@ each other.
 `release.yaml` is started by hand and publishes to Maven Central from a release branch. It deploys
 no snapshot, so it can run beside a publish.
 
+`nightly-build.yaml` runs `build.yaml` on `main` once a night, with `--update-snapshots`. So a
+`main` which a new snapshot of the platform or of the cockpit breaks is seen, even when nobody
+pushed here. It publishes nothing. It waits for a publish which is running or waiting, and then
+joins the publish's group, so it never takes the place of a waiting publish. A red night becomes
+one issue with the label `nightly-build`, and a night which is still red is a comment on that
+issue. A green night after a red one is a comment too, and somebody closes the issue by hand.
+
 `deploy-to-github-packages.yaml` also publishes the two coverage reports to GitHub Pages, which is
 what the badges at the top of this page link to. `deploy` runs every phase the pull-request build
 runs, so the number covers the whole test suite: on both platforms the tests boot a real
