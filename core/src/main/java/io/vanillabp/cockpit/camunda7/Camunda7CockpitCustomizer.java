@@ -25,8 +25,8 @@ import io.vanillabp.integration.adapter.spi.NameClashAvoidanceSupport;
  * What the Business Cockpit adds to every Camunda 7 engine VanillaBP builds.
  * <p>
   * Two things, and both of them the engine's own hooks rather than anything written into a model:
-  * a parse listener attaching the cockpit's task listeners to each user task, and a handler for
-  * the process-instance history events. The parse listener is contributed as an <b>after</b>
+  * a parse listener attaching the cockpit's task listeners to each user task of a claimed
+  * process, and a handler for the process-instance history events. The parse listener is contributed as an <b>after</b>
   * listener. The tasks it sees are therefore the tasks VanillaBP has already wired, and the
   * cockpit's listeners run behind VanillaBP's own. That is the order a details provider needs,
   * because it is called on an aggregate a completed task may just have changed.

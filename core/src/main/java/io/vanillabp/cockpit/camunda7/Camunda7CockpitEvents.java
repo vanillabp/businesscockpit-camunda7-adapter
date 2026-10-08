@@ -119,6 +119,24 @@ public class Camunda7CockpitEvents {
   }
 
   /**
+   * Tells whether the cockpit is told about a process at all. That is the case for a process a
+   * <code>&#64;WorkflowService</code> of this application claims, and for no other: not for one
+   * the module deploys for somebody else, and not for one somebody deployed past VanillaBP. See
+   * {@code DECISIONS.pending/1451.md}.
+   *
+   * @param tenantId The tenant the engine stored, <code>null</code> where it stored none
+   * @param processDefinitionKey The process definition key the engine stored
+   * @return Whether events of that process are reported
+   */
+  public boolean reportsAbout(
+      final String tenantId,
+      final String processDefinitionKey) {
+
+    return processes.resolve(scope, tenantId, processDefinitionKey).isPresent();
+
+  }
+
+  /**
    * Reports what happened to one user task.
    *
    * @param task The task the engine handed to the listener
@@ -139,7 +157,7 @@ public class Camunda7CockpitEvents {
     if (process.isEmpty()) {
       logger
           .debug(
-              "Camunda7[{}]: not reporting user task '{}': its process definition '{}' belongs to no workflow module of this application",
+              "Camunda7[{}]: not reporting user task '{}': no @WorkflowService of this application claims its process definition '{}'",
               scope.adapterId(), task.getId(), definition.getKey());
       return;
     }

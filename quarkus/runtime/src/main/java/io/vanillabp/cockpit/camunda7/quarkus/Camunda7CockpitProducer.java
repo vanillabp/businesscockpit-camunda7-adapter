@@ -17,6 +17,7 @@ import io.vanillabp.cockpit.extension.spi.BusinessCockpitBpmsBridge;
 import io.vanillabp.cockpit.extension.spi.BusinessCockpitEventPublisher;
 import io.vanillabp.integration.adapter.migration.config.MigrationAdapterProperties;
 import io.vanillabp.integration.adapter.spi.NameClashAvoidanceSupport;
+import io.vanillabp.integration.adapter.spi.workflowtask.WorkflowTaskWiring;
 import io.vanillabp.integration.extension.spi.ExtensionWiringService;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
@@ -61,7 +62,9 @@ public class Camunda7CockpitProducer {
   /**
    * Produces this extension's wiring service.
    *
-   * @param processes The deployed processes
+   * @param processes The claimed processes
+   * @param workflowTaskWiring VanillaBP's registry, which answers whether a
+   *          <code>&#64;WorkflowService</code> claims a process
    * @return This extension's place in VanillaBP's deployment pipeline, taken for a workflow
    *         module which runs on Camunda 7 and for no other
    */
@@ -69,9 +72,10 @@ public class Camunda7CockpitProducer {
   @Singleton
   @Unremovable
   public ExtensionWiringService<BpmnModelInstance, Camunda7ProcessingContext> businessCockpitCamunda7WiringService(
-      final Camunda7WorkflowProcesses processes) {
+      final Camunda7WorkflowProcesses processes,
+      final WorkflowTaskWiring workflowTaskWiring) {
 
-    return new Camunda7CockpitWiring(processes);
+    return new Camunda7CockpitWiring(processes, workflowTaskWiring);
 
   }
 

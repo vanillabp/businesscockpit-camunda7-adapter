@@ -8,15 +8,16 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 
 /**
- * Which BPMN processes of which workflow modules this application deployed, and how to get
- * from an engine's own identifiers back to them.
+ * Which BPMN processes of which workflow modules this application deployed and claims, and how
+ * to get from an engine's own identifiers back to them.
  * <p>
   * An engine reports a task or a history event with the process definition key and the tenant it
   * stored. Both of those depend on the name-clash avoidance the module was deployed with. The
-  * translation back is therefore not a string operation but a lookup. Every process VanillaBP
-  * wires is remembered here while the deployment pipeline runs. An event of a process which is
-  * not in here belongs to something else: another application on the same database, or a process
-  * definition of an earlier release which is no longer part of this one.
+  * translation back is therefore not a string operation but a lookup. Every process a
+  * <code>&#64;WorkflowService</code> claims is remembered here while the deployment pipeline runs.
+  * An event of a process which is not in here belongs to something else: a process the module
+  * deploys for somebody else, another application on the same database, or a process definition
+  * of an earlier release which is no longer part of this one.
  * <p>
  * The reverse map is built per adapter id and thrown away whenever a process is added, which
  * happens a handful of times while the application starts and never afterwards.
@@ -57,8 +58,9 @@ public class Camunda7WorkflowProcesses {
   private final Map<String, Map<String, WorkflowProcess>> byEngineIdentity = new ConcurrentHashMap<>();
 
   /**
-   * Remembers a BPMN process VanillaBP is deploying. Called while the deployment pipeline runs
-   * and therefore before the engine parses that module's files.
+   * Remembers a BPMN process VanillaBP is deploying and a <code>&#64;WorkflowService</code>
+   * claims. Called while the deployment pipeline runs and therefore before the engine parses that
+   * module's files.
    *
    * @param workflowModuleId The workflow module
    * @param bpmnProcessId The plain BPMN process id
