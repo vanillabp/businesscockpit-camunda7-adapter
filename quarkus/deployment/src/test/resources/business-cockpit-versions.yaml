@@ -23,10 +23,20 @@ vanillabp:
           allow-full-sync-with-bpms: true
           declared-aggregate-values:
             - signers
+          tasks:
+            Approve:
+              implemented-externally: true
         MultiInstanceProcess:
           allow-full-sync-with-bpms: true
           declared-aggregate-values:
             - signers
+          tasks:
+            MI_Sign:
+              implemented-externally: true
+        CalledSignProcess:
+          tasks:
+            CS_Sign:
+              implemented-externally: true
       cockpit:
         workflow-module-uri: http://localhost:8081/c7-cockpit
         ui-uri-type: WEBPACK_MF_REACT

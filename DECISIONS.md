@@ -31,7 +31,7 @@ details provider the cockpit calls afterwards is meant to see the changed one.
 Both platforms have a test for it. It reads the parsed task definition of a deployed process and
 checks that all four events carry a built-in listener of the cockpit, and that it is the last one.
 
-## 2. Every user task is reported, whether or not the application enriches it
+## 2. Every user task is reported, whether or not the application enriches it - a provider still serves nothing, see decision 13
 
 The listeners sit on every user task of every deployed process, and every event they see is
 reported. A `@UserTaskDetailsProvider` for that task decides how much the cockpit is told about it.
@@ -345,3 +345,38 @@ transaction, and the listener of the start event runs later in a job. The name a
 different command, after the memory was dropped. Such a workflow still arrives as `UPDATED`, and
 the server creates the case at the time of the change, as before. Nothing in VanillaBP sets
 `asyncBefore` on a start event, so the case needs a model which asks for it.
+
+## 13. A details provider does not serve a user task, so a task only the cockpit shows is marked as served elsewhere
+
+This entry adds to decision 2.
+
+### What changed around this adapter
+
+The platform now asks every task of a claimed process for a `@WorkflowTask` method or for the line
+`implemented-externally=true`. Without either, the start ends. The platform states this rule in the
+decision log of `adapter-platform-integration`. Before it, the Camunda 7 adapter let a user task
+without a method pass and named it once at INFO, and nothing was refused. The test applications of
+this repository relied on that. Their user tasks have a `@UserTaskDetailsProvider` and no method,
+and after the platform change none of them started.
+
+### What this adapter does about it
+
+A `@UserTaskDetailsProvider` does not count as serving a task (the maintainer, 2026-10-08). The
+provider tells the cockpit what to show about a task. It does not do the work the task stands for,
+and the start cannot know that a person works the task off in a task list. So decision 2 stays as it
+is: every user task is reported, with or without a provider. But a user task of a claimed process
+which has no method needs the line, the same as in any other application.
+
+The test applications write the line at the task, by element id, one line per user task. That is the
+narrowest place the key has. A line at the workflow or at the workflow module would also work, but
+it would quietly cover a user task added to a test model later. The start would then no longer tell
+anybody that the new task has neither a method nor a line. The element id is used rather than the
+form key because one test process has a user task without a form key, and because the element id is
+where the configuration of a task is going.
+
+No test of this repository checked that an unserved user task passes. The test for a user task
+without a form key now marks that task by its element id, and still checks that the cockpit is told
+about it. The rule itself is tested in the platform.
+
+The wiki now says this next to its link to decision 2: a provider decides what the cockpit shows,
+and the line says that no method of the application serves the task.
