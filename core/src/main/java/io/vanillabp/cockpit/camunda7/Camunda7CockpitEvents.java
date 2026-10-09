@@ -122,7 +122,7 @@ public class Camunda7CockpitEvents {
    * Tells whether the cockpit is told about a process at all. That is the case for a process a
    * <code>&#64;WorkflowService</code> of this application claims, and for no other: not for one
    * the module deploys for somebody else, and not for one somebody deployed past VanillaBP. See
-   * {@code DECISIONS.pending/1451.md}.
+   * decision 14 in the repository's DECISIONS.md.
    *
    * @param tenantId The tenant the engine stored, <code>null</code> where it stored none
    * @param processDefinitionKey The process definition key the engine stored

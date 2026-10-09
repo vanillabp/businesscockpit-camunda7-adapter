@@ -31,7 +31,7 @@ details provider the cockpit calls afterwards is meant to see the changed one.
 Both platforms have a test for it. It reads the parsed task definition of a deployed process and
 checks that all four events carry a built-in listener of the cockpit, and that it is the last one.
 
-## 2. Every user task is reported, whether or not the application enriches it - a provider still serves nothing, see decision 13
+## 2. Every user task is reported, whether or not the application enriches it - a provider still serves nothing, see decision 13, and only a claimed process counts, see decision 14
 
 The listeners sit on every user task of every deployed process, and every event they see is
 reported. A `@UserTaskDetailsProvider` for that task decides how much the cockpit is told about it.
@@ -61,7 +61,7 @@ Only root process instances are reported. A called process is a step of a busine
 than a case of its own. For the same reason, the reads answering the cockpit's questions about the
 workflows of an aggregate leave the called ones out.
 
-## 4. An engine's identifiers are translated back through the deployed processes, never by parsing
+## 4. An engine's identifiers are translated back through the deployed processes, never by parsing - only claimed processes are remembered, see decision 14
 
 A Camunda 7 engine reports a task or a history event with the process definition key and the
 tenant it stored. Both depend on the name-clash avoidance the workflow module was deployed with: a
@@ -380,3 +380,49 @@ about it. The rule itself is tested in the platform.
 
 The wiki now says this next to its link to decision 2: a provider decides what the cockpit shows,
 and the line says that no method of the application serves the task.
+
+## 14. Only a process a `@WorkflowService` claims gets a listener and is reported
+
+This entry adds to decisions 2 and 4.
+
+The platform repository `adapter-platform-integration` sorts the processes a Camunda 7 engine runs
+into three kinds:
+
+- A: a `@WorkflowService` of the application claims the process, as its `bpmnProcess` or as one of
+  its `secondaryBpmnProcesses`.
+- B: the workflow module deploys the process, but no `@WorkflowService` claims it. The platform
+  allows this only when the process is marked with
+  `vanillabp.workflow-modules.<wm>.workflows.<id>.implemented-externally=true`.
+- C: the process is foreign. It is only in the engine, for example deployed through the Camunda API.
+
+The platform rule is that VanillaBP leaves B and C as they were modelled: no listener and no change
+to the BPMN, and nothing reacts to them. This extension follows the same rule:
+
+- `Camunda7CockpitWiring.wireBpmn` remembers a process only if it is A. The core calls `wireBpmn`
+  for B too, so the extension asks itself, through
+  `WorkflowTaskWiring.isClaimedByAWorkflowService(workflowModuleId, bpmnProcessId)`. That is the one
+  question all three cockpit adapters ask. The extension gets `WorkflowTaskWiring` as a bean on Spring
+  Boot and on Quarkus, and it builds no answer of its own out of the election or out of
+  `resolveWorkflowAggregateIdName`.
+- `Camunda7UserTaskParseListener` attaches the cockpit's listeners only to user tasks of a remembered
+  process. It looks the process up by the tenant and the process definition key the engine stores,
+  the same lookup decision 4 describes for events. So the listener and the report always agree on
+  which processes count, also for a process of another workflow module of the same application.
+  Where the module deploys into a tenant, a foreign process without a tenant does not match, even
+  when it has the id of a claimed process.
+- `Camunda7CockpitEvents` reports nothing about a process it cannot look up. A process of B or C is
+  never remembered, so its tasks and its workflows are never reported, also when the process
+  instance carries a business key.
+
+Before this change, every process of the module was remembered and every parsed user task got the
+listeners. A process of B which ran with a business key appeared in the cockpit as a case. Its
+aggregate id was the business key, but no aggregate existed and no details provider could serve it.
+The Camunda 8 cockpit adapter never showed such a process, so the same model gave two answers
+depending on the BPMS.
+
+A process a call activity starts is A when a `@WorkflowService` names it as a secondary process. Its
+user tasks get the listeners and are reported, as before.
+
+Decision 2 says that every user task is reported. That now means every user task of a process of
+kind A. Decision 4 says that a process which is not among the remembered ones is passed over. That
+now includes B.

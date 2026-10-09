@@ -29,7 +29,7 @@ import io.vanillabp.camunda7.api.Camunda7TaskDefinitions;
   * A user task of any other process gets nothing. The engine parses every model it runs, also one
   * the workflow module deploys for somebody else and one somebody deployed past VanillaBP. The
   * cockpit reports nothing about those, so a listener there would only be one more thing in a
-  * model which is not this application's. See {@code DECISIONS.pending/1451.md}.
+  * model which is not this application's. See decision 14 in the repository's DECISIONS.md.
  * <p>
  * Why built-in and why after VanillaBP's own is decision 1 in the repository's DECISIONS.md, and
  * that every user task gets them whether or not the application enriches it is decision 2 in the

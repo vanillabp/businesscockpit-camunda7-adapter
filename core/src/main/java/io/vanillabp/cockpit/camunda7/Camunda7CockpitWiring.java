@@ -22,7 +22,7 @@ import io.vanillabp.integration.extension.spi.ExtensionWiringService;
   * A process the module deploys but no <code>&#64;WorkflowService</code> claims is not remembered.
   * It gets no listener and nothing about it is reported. The same holds for a process which
   * somebody deployed past VanillaBP, because the pipeline never hands that one over at all. See
-  * {@code DECISIONS.pending/1451.md}.
+  * decision 14 in the repository's DECISIONS.md.
  * <p>
   * The model is not touched. On an embedded engine a listener is not written into the BPMN but
   * attached while the engine parses it, which is what the engine customizer of this extension
@@ -92,7 +92,7 @@ public class Camunda7CockpitWiring implements ExtensionWiringService<BpmnModelIn
 
     // the core hands over every process of the file, also one the module only deploys for
     // somebody else. Such a process has no workflow aggregate, so the cockpit has no case to
-    // show for it. See DECISIONS.pending/1451.md
+    // show for it. See decision 14 in the repository's DECISIONS.md
     if (!workflowTaskWiring.isClaimedByAWorkflowService(workflowModuleId, bpmnProcessId)) {
       logger
           .debug(
