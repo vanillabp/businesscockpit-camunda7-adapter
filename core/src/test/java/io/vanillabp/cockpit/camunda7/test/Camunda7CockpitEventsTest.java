@@ -1,6 +1,7 @@
 package io.vanillabp.cockpit.camunda7.test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -27,6 +28,7 @@ import io.vanillabp.camunda7.api.Camunda7EngineFacts;
 import io.vanillabp.camunda7.wiring.Camunda7ProcessVersions;
 import io.vanillabp.camunda7.wiring.Camunda7TaskRegistry;
 import io.vanillabp.cockpit.camunda7.Camunda7CockpitEvents;
+import io.vanillabp.cockpit.camunda7.Camunda7CockpitWiring;
 import io.vanillabp.cockpit.camunda7.Camunda7EventBeingReported;
 import io.vanillabp.cockpit.camunda7.Camunda7Scope;
 import io.vanillabp.cockpit.camunda7.Camunda7WorkflowHistoryHandler;
@@ -36,6 +38,7 @@ import io.vanillabp.cockpit.extension.spi.UserTaskEventKind;
 import io.vanillabp.cockpit.extension.spi.WorkflowEventKind;
 import io.vanillabp.integration.adapter.migration.config.MigrationAdapterProperties;
 import io.vanillabp.integration.adapter.migration.scoping.NameClashAvoidanceService;
+import io.vanillabp.integration.adapter.spi.workflowtask.WorkflowTaskWiring;
 import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 
 /**
@@ -339,6 +342,35 @@ public class Camunda7CockpitEventsTest {
     assertTrue(
         reported.isAfter(OffsetDateTime.now().minusMinutes(1)),
         "the timestamp was not filled in: %s".formatted(reported));
+
+  }
+
+  @Test
+  @DisplayName("A process the module deploys but nobody claims is not remembered, so nothing of it is reported")
+  public void anUnclaimedProcessIsNotReported() {
+
+    final var unclaimed = "UnclaimedProcess";
+    final var claimed = "AnotherClaimedProcess";
+    final var workflowTaskWiring = mock(WorkflowTaskWiring.class);
+    when(workflowTaskWiring.isClaimedByAWorkflowService(MODULE_ID, claimed)).thenReturn(true);
+    when(workflowTaskWiring.isClaimedByAWorkflowService(MODULE_ID, unclaimed)).thenReturn(false);
+    final var wiring = new Camunda7CockpitWiring(processes, workflowTaskWiring);
+
+    wiring.wireBpmn(MODULE_ID, "unclaimed.bpmn", unclaimed, null, null);
+    wiring.wireBpmn(MODULE_ID, "claimed.bpmn", claimed, null, null);
+
+    assertFalse(events.reportsAbout(MODULE_ID, unclaimed));
+    assertTrue(events.reportsAbout(MODULE_ID, claimed));
+    events
+        .reportUserTask(
+            aTaskOf(MODULE_ID, unclaimed, "4711"), "TheTask", "the-form",
+            UserTaskEventKind.CREATED);
+    new Camunda7WorkflowHistoryHandler(events)
+        .handleEvent(
+            anInstanceEvent(
+                HistoryEventTypes.PROCESS_INSTANCE_START, MODULE_ID, unclaimed, "4711"));
+    assertTrue(publisher.userTasks().isEmpty(), publisher.userTasks().toString());
+    assertTrue(publisher.workflowTimestamps().isEmpty(), publisher.workflowTimestamps().toString());
 
   }
 

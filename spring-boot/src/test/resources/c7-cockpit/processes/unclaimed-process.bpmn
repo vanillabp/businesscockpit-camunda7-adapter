@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" id="UnclaimedDefinitions" targetNamespace="http://vanillabp.io/businesscockpit/camunda7">
+  <bpmn:process id="UnclaimedProcess" isExecutable="true">
+    <bpmn:startEvent id="UP_Start">
+      <bpmn:outgoing>UP_ToApprove</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:sequenceFlow id="UP_ToApprove" sourceRef="UP_Start" targetRef="UP_Approve" />
+    <bpmn:userTask id="UP_Approve" name="Approve an order of somebody else" camunda:formKey="approveUnclaimed">
+      <bpmn:incoming>UP_ToApprove</bpmn:incoming>
+      <bpmn:outgoing>UP_ToEnd</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="UP_ToEnd" sourceRef="UP_Approve" targetRef="UP_End" />
+    <bpmn:endEvent id="UP_End">
+      <bpmn:incoming>UP_ToEnd</bpmn:incoming>
+    </bpmn:endEvent>
+  </bpmn:process>
+</bpmn:definitions>
