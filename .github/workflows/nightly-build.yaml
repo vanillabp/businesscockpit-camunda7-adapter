@@ -57,7 +57,7 @@ jobs:
           set -euo pipefail
           deadline=$(( $(date +%s) + 60 * 60 ))
           while :; do
-            busy=$(gh run list --workflow deploy-to-github-packages.yaml --branch main \
+            busy=$(gh run list --workflow publish-snapshots.yaml --branch main \
               --limit 20 --json status --jq '[.[] | select(.status != "completed")] | length')
             if [ "$busy" -eq 0 ]; then
               echo "No publish of main runs or waits."
@@ -74,7 +74,7 @@ jobs:
 
   build:
     needs: publish-is-quiet
-    # The group of the publish, see deploy-to-github-packages.yaml. Only main publishes,
+    # The group of the publish, see publish-snapshots.yaml. Only main publishes,
     # so it is the group of the publish of main.
     concurrency:
       group: businesscockpit-camunda7-adapter-publish
