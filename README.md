@@ -104,9 +104,18 @@ each with an embedded Camunda 7 engine on H2, a cockpit server the test runs its
 in between. No BPMS double and no mock of the engine, because what is under test is exactly the
 part which touches the engine.
 
-Snapshots are published to GitHub Packages by the pipeline described below, and releases go to
-Maven Central under the groupId `io.vanillabp.businesscockpit`, like the rest of the Business
-Cockpit.
+The build reads the snapshots of the platform and of the cockpit from the snapshot repository of
+Maven Central, `https://central.sonatype.com/repository/maven-snapshots/`. The parent
+`io.vanillabp:release-parent` names that repository, and reading it needs no login. The snapshot of
+the Camunda 7 adapter is the exception. Its namespace belongs to the Camunda Community Hub, so it is
+published to `https://maven.pkg.github.com/camunda-community-hub/vanillabp-camunda7-adapter`, and
+GitHub Packages asks for a token even for a public package. A local build needs that repository in
+`~/.m2/settings.xml`, with a GitHub token which has the scope `read:packages`. CI reads it through
+[.github/workflows/github-packages-settings.xml](./.github/workflows/github-packages-settings.xml).
+
+Snapshots of this repository go to the snapshot repository of Maven Central through the pipeline
+described below, and releases go to Maven Central under the groupId `io.vanillabp.businesscockpit`,
+like the rest of the Business Cockpit.
 
 ## Test coverage
 
@@ -151,7 +160,7 @@ file the run could not have written.
 `build.yaml` builds and tests a pull request, in a group per pull request, so an open pull request
 never takes the waiting run of another one out.
 
-`deploy-to-github-packages.yaml` publishes the snapshot, and only for a push to `main`. The
+`publish-snapshots.yaml` publishes the snapshot, and only for a push to `main`. The
 snapshot artifacts share their coordinates, so what the other repositories compile against has to
 be what `main` holds. It runs in a group of its own, one publish at a time. A publish which is
 already running is never cancelled, because two runs publishing at the same time would overwrite
@@ -167,7 +176,7 @@ joins the publish's group, so it never takes the place of a waiting publish. A r
 one issue with the label `nightly-build`, and a night which is still red is a comment on that
 issue. A green night after a red one is a comment too, and somebody closes the issue by hand.
 
-`deploy-to-github-packages.yaml` also publishes the two coverage reports to GitHub Pages, which is
+`publish-snapshots.yaml` also publishes the two coverage reports to GitHub Pages, which is
 what the badges at the top of this page link to. `deploy` runs every phase the pull-request build
 runs, so the number covers the whole test suite: on both platforms the tests boot a real
 application against an embedded Camunda 7 engine.
