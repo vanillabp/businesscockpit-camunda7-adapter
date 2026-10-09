@@ -35,7 +35,9 @@ import io.vanillabp.integration.test.utils.SuppressOutputExtension;
  * <code>UnclaimedProcess</code>, but no <code>&#64;WorkflowService</code> names it, and the
  * configuration marks it as run by somebody else. The other kind never passed VanillaBP at all: a
  * test deploys it through the engine's own API. Neither of them gets the cockpit's listener, and
- * a workflow of either one is never reported, even with a business key.
+ * a workflow of either one is never reported, even with a business key. This is also true when
+ * such a process has the id of a claimed one: the module deploys into a tenant, and the foreign
+ * process has none.
  * <p>
  * A process which a call activity starts is claimed too, when a <code>&#64;WorkflowService</code>
  * names it as a secondary process. Its user task is reported, which the tests about the round of a
@@ -211,6 +213,20 @@ public class Camunda7UnclaimedProcessesTest {
   public void aProcessDeployedPastVanillaBpIsLeftAlone() {
 
     final var definition = aProcessDeployedPastVanillaBp(FOREIGN_PROCESS_ID);
+
+    assertNoCockpitListener(theBuiltInListenersOf(definition, FOREIGN_TASK_ID));
+    assertEquals(List.of(), whatArrivesAboutAWorkflowOf(definition));
+
+  }
+
+  @Test
+  @DisplayName("A process deployed past VanillaBP under the id of a claimed process gets no listener and is never reported")
+  public void aProcessDeployedPastVanillaBpUnderAClaimedIdIsLeftAlone() {
+
+    // the workflow module deploys into a tenant of its own, and this definition has none. So it
+    // is not the claimed process, although its key is the same. The Camunda 7 adapter leaves it
+    // alone too, so the start with a business key below is not refused
+    final var definition = aProcessDeployedPastVanillaBp(TestWorkflowService.BPMN_PROCESS_ID);
 
     assertNoCockpitListener(theBuiltInListenersOf(definition, FOREIGN_TASK_ID));
     assertEquals(List.of(), whatArrivesAboutAWorkflowOf(definition));
