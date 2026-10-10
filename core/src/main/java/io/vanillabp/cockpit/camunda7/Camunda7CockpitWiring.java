@@ -58,6 +58,8 @@ public class Camunda7CockpitWiring implements ExtensionWiringService<BpmnModelIn
 
     this.processes = processes;
     this.workflowTaskWiring = workflowTaskWiring;
+    // the reports ask the core later which called process shares its caller's aggregate
+    processes.rememberTheCore(workflowTaskWiring);
 
   }
 

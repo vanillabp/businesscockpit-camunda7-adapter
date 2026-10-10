@@ -55,6 +55,18 @@ vanillabp:
           tasks:
             CS_Sign:
               implemented-externally: true
+        CaseCallingProcess:
+          allow-full-sync-with-bpms: true
+        CalledStepProcess:
+          allow-full-sync-with-bpms: true
+          tasks:
+            CST_Do:
+              implemented-externally: true
+        OwnCaseProcess:
+          allow-full-sync-with-bpms: true
+          tasks:
+            OC_Check:
+              implemented-externally: true
         SignalStartedProcess:
           allow-full-sync-with-bpms: true
           tasks:

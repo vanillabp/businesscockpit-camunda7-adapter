@@ -24,7 +24,6 @@ import org.camunda.bpm.engine.task.Task;
 
 import io.vanillabp.camunda7.Camunda7Adapter;
 import io.vanillabp.camunda7.api.Camunda7EngineFacts;
-import io.vanillabp.camunda7.api.Camunda7Executions;
 import io.vanillabp.camunda7.api.Camunda7MultiInstances;
 import io.vanillabp.camunda7.api.Camunda7TaskDefinitions;
 import io.vanillabp.cockpit.extension.spi.BusinessCockpitBpmsBridge;
@@ -179,18 +178,24 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         ? query.tenantIdIn(tenantId)
         : query.withoutTenantId();
 
-    return query
+    final var instances = query;
+    return inOneEngineCommand(() -> instances
         .list()
         .stream()
-        // the cockpit shows business cases; a called process is a step of one - see
-        // decision 3 in the repository's DECISIONS.md
-        .filter(instance -> instance.getSuperProcessInstanceId() == null)
+        // the cockpit shows business cases. A called process which shares its caller's
+        // aggregate is a step of the caller's case, and one with an aggregate of its own is a
+        // case - see decisions 3 and 15 in the repository's DECISIONS.md
+        .filter(
+            instance -> Camunda7BusinessCases
+                .isACase(
+                    scope, processes, Camunda7BusinessCases.instanceOf(instance), Camunda7BusinessCases
+                        .callerOf(engine.getHistoryService(), instance.getSuperProcessInstanceId())))
         .map(
             instance -> new WorkflowReference(
                 scope.adapterId(), workflowModuleId, bpmnProcessId, scope
                     .processVersionOf(
                         instance.getProcessDefinitionId()), workflowAggregateId, instance.getId()))
-        .toList();
+        .toList());
 
   }
 
@@ -218,7 +223,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         () -> tasksOfTheAggregate
             .list()
             .stream()
-            .map(task -> referenceOf(task, workflowModuleId, workflowAggregateId))
+            .map(task -> referenceOf(task, workflowModuleId, bpmnProcessId, workflowAggregateId))
             .flatMap(Optional::stream)
             .toList());
 
@@ -247,7 +252,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
     return inOneEngineCommand(
         () -> Optional
             .ofNullable(theTask.singleResult())
-            .flatMap(task -> referenceOf(task, workflowModuleId, workflowAggregateId)));
+            .flatMap(task -> referenceOf(task, workflowModuleId, bpmnProcessId, workflowAggregateId)));
 
   }
 
@@ -256,15 +261,22 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
     * workflow module deployed. Under <code>none</code> and under <code>use-prefix</code> no
     * tenant separates the modules of an application. A business key which two of them use would
     * otherwise answer one module's question with another module's task.
+   * <p>
+   * Its process also has to work on the aggregate which was asked about. Two aggregate classes
+   * may count their ids alike, so a business key does not say which aggregate it belongs to. A
+   * task of a called process with an aggregate of its own belongs to that case and not to the
+   * caller's (decision 15 in the repository's DECISIONS.md).
    *
    * @param task The task the engine answered with
    * @param workflowModuleId The workflow module which was asked about
+   * @param bpmnProcessId The process of the aggregate which was asked about
    * @param workflowAggregateId The aggregate which was asked about, which is the business key
    *          every one of these queries filtered on
    */
   private Optional<UserTaskReference> referenceOf(
       final Task task,
       final String workflowModuleId,
+      final String bpmnProcessId,
       final String workflowAggregateId) {
 
     final var definition = definitionOf(task.getProcessDefinitionId());
@@ -274,16 +286,18 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
     return processes
         .resolve(scope, definition.getTenantId(), definition.getKey())
         .filter(process -> process.workflowModuleId().equals(workflowModuleId))
+        .filter(
+            process -> process.bpmnProcessId().equals(bpmnProcessId) || processes
+                .shareTheWorkflowAggregate(
+                    new Camunda7WorkflowProcesses.WorkflowProcess(workflowModuleId, bpmnProcessId), process))
         .map(
             process -> new UserTaskReference(
                 scope.adapterId(), process.workflowModuleId(), process
                     .bpmnProcessId(), scope
                         .processVersionOf(
-                            task.getProcessDefinitionId()), workflowAggregateId, Camunda7Executions
-                                .rootProcessInstanceIdOf(
-                                    engine.getHistoryService(), task
-                                        .getProcessInstanceId()), task
-                                            .getId(), taskDefinitionOf(task), task.getTaskDefinitionKey()));
+                            task.getProcessDefinitionId()), workflowAggregateId, caseOf(task
+                                .getProcessInstanceId()), task
+                                    .getId(), taskDefinitionOf(task), task.getTaskDefinitionKey()));
 
   }
 
@@ -313,7 +327,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
       final String bpmnProcessId) {
 
     final var execution = (ExecutionEntity) task.getExecution();
-    final var rootProcessInstanceId = Camunda7Executions.rootProcessInstanceIdOf(execution);
+    final var caseId = Camunda7BusinessCases.caseOf(scope, processes, execution);
     final var candidates = candidatesOf(task.getCandidates());
 
     return UserTaskDetailsPrefill
@@ -321,9 +335,9 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         .bpmnProcessVersion(versionOf(execution.getProcessDefinitionId()))
         .bpmnProcessName(processNameOf(execution.getProcessDefinition(), bpmnProcessId))
         .bpmnTaskName(task.getName())
-        .workflowId(rootProcessInstanceId)
+        .workflowId(caseId)
         .subWorkflowId(
-            execution.getProcessInstanceId().equals(rootProcessInstanceId)
+            execution.getProcessInstanceId().equals(caseId)
                 ? null
                 : execution.getProcessInstanceId())
         .businessId(execution.getBusinessKey())
@@ -375,7 +389,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
    * <p>
     * The business case the task belongs to is read off the process instance rather than off the
     * task, although the task records it too. The instance is in hand here anyway, and taking it
-    * from one place means one rule about what a root is.
+    * from one place means one rule about what a case is.
    */
   private UserTaskDetailsPrefill prefillOfTheRunningTask(
       final Task task,
@@ -390,7 +404,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         .bpmnProcessVersion(versionOf(task.getProcessDefinitionId()))
         .bpmnProcessName(processNameOf(definition, bpmnProcessId))
         .bpmnTaskName(task.getName())
-        .workflowId(Camunda7Executions.rootProcessInstanceIdOf(workflow))
+        .workflowId(caseOf(workflow))
         .subWorkflowId(subWorkflowIdOf(workflow))
         .businessId(workflow == null ? null : workflow.getBusinessKey())
         .assignee(task.getAssignee())
@@ -489,15 +503,36 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
   }
 
   /** Named only where the task really sits in a called process. */
-  private static String subWorkflowIdOf(
+  private String subWorkflowIdOf(
       final HistoricProcessInstance workflow) {
 
     if (workflow == null) {
       return null;
     }
-    return workflow.getId().equals(Camunda7Executions.rootProcessInstanceIdOf(workflow))
+    return workflow.getId().equals(caseOf(workflow))
         ? null
         : workflow.getId();
+
+  }
+
+  /**
+   * The business case of an instance, read from the history. See decision 15 in the
+   * repository's DECISIONS.md.
+   */
+  private String caseOf(
+      final HistoricProcessInstance workflow) {
+
+    return Camunda7BusinessCases.caseOf(scope, processes, engine.getHistoryService(), workflow);
+
+  }
+
+  private String caseOf(
+      final String processInstanceId) {
+
+    final var workflow = historicWorkflow(processInstanceId);
+    return workflow == null
+        ? processInstanceId
+        : caseOf(workflow);
 
   }
 

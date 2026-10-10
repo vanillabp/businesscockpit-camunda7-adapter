@@ -16,7 +16,6 @@ import org.camunda.bpm.engine.impl.persistence.entity.ExecutionEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.vanillabp.camunda7.api.Camunda7Executions;
 import io.vanillabp.cockpit.extension.spi.BusinessCockpitEventPublisher;
 import io.vanillabp.cockpit.extension.spi.EventTransaction;
 import io.vanillabp.cockpit.extension.spi.UserTaskEventKind;
@@ -175,9 +174,8 @@ public class Camunda7CockpitEvents {
         scope.adapterId(), process.get().workflowModuleId(), process.get()
             .bpmnProcessId(), scope
                 .processVersionOf(
-                    definition.getId()), workflowAggregateId, Camunda7Executions
-                        .rootProcessInstanceIdOf(
-                            execution), task.getId(), taskDefinition, bpmnTaskId);
+                    definition.getId()), workflowAggregateId, Camunda7BusinessCases
+                        .caseOf(scope, processes, execution), task.getId(), taskDefinition, bpmnTaskId);
     eventBeingReported
         .whileReporting(
             task,
@@ -200,14 +198,15 @@ public class Camunda7CockpitEvents {
       final HistoricProcessInstanceEventEntity event,
       final WorkflowEventKind kind) {
 
-    // the cockpit shows business cases, and a called process is a step of one rather than a
-    // case of its own - see decision 3 in the repository's DECISIONS.md
-    if (event.getSuperProcessInstanceId() != null) {
-      return;
-    }
     final var process = processes
         .resolve(scope, event.getTenantId(), event.getProcessDefinitionKey());
     if (process.isEmpty()) {
+      return;
+    }
+    // the cockpit shows business cases. A called process which shares its caller's workflow
+    // aggregate is a step of the caller's case, and one with an aggregate of its own is a case
+    // of its own - see decisions 3 and 15 in the repository's DECISIONS.md
+    if (isAStepOfItsCaller(event)) {
       return;
     }
     final var workflowAggregateId = event.getBusinessKey();
@@ -247,6 +246,31 @@ public class Camunda7CockpitEvents {
                 .get()
                 .publishWorkflowEvent(
                     reference, reportedKind, event.getId(), timestamp, transaction()));
+
+  }
+
+  /**
+   * Whether the instance of a history event is a step of the case of the instance which called
+   * it. The caller runs while the instance it called starts or ends, so the running command holds
+   * it. Where it does not, the instance is taken as a step, which is what every called process
+   * was before decision 15.
+   */
+  private boolean isAStepOfItsCaller(
+      final HistoricProcessInstanceEventEntity event) {
+
+    if (event.getSuperProcessInstanceId() == null) {
+      return false;
+    }
+    final var caller = Camunda7BusinessCases.callerInTheRunningCommand(event.getSuperProcessInstanceId());
+    if (caller == null) {
+      return true;
+    }
+    return !Camunda7BusinessCases
+        .isACase(
+            scope, processes, new Camunda7BusinessCases.Instance(
+                event.getProcessInstanceId(), event.getTenantId(), event.getProcessDefinitionKey(), event
+                    .getSuperProcessInstanceId()),
+            caller);
 
   }
 
