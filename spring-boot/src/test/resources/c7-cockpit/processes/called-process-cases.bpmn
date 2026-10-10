@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" id="CalledProcessCasesDefinitions" targetNamespace="http://vanillabp.io/businesscockpit/camunda7">
+  <!-- a case which calls two processes at once. The step works on the same workflow aggregate
+       and belongs to this case. The other one has a workflow aggregate of its own and is a case
+       of its own. Both call activities name their process, so the adapter knows which one shares
+       the aggregate and passes the business key only to that one. -->
+  <bpmn:process id="CaseCallingProcess" isExecutable="true">
+    <bpmn:startEvent id="CC_Start">
+      <bpmn:outgoing>CC_ToFork</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:sequenceFlow id="CC_ToFork" sourceRef="CC_Start" targetRef="CC_Fork" />
+    <bpmn:parallelGateway id="CC_Fork">
+      <bpmn:incoming>CC_ToFork</bpmn:incoming>
+      <bpmn:outgoing>CC_ToStep</bpmn:outgoing>
+      <bpmn:outgoing>CC_ToOwnCase</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:sequenceFlow id="CC_ToStep" sourceRef="CC_Fork" targetRef="CC_CallStep" />
+    <bpmn:sequenceFlow id="CC_ToOwnCase" sourceRef="CC_Fork" targetRef="CC_CallOwnCase" />
+    <bpmn:callActivity id="CC_CallStep" name="Do the step" calledElement="CalledStepProcess">
+      <bpmn:incoming>CC_ToStep</bpmn:incoming>
+      <bpmn:outgoing>CC_StepToJoin</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:callActivity id="CC_CallOwnCase" name="Open a case of its own" calledElement="OwnCaseProcess">
+      <bpmn:extensionElements>
+        <camunda:in sourceExpression="${execution.processBusinessKey}" target="callersId" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>CC_ToOwnCase</bpmn:incoming>
+      <bpmn:outgoing>CC_OwnCaseToJoin</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:sequenceFlow id="CC_StepToJoin" sourceRef="CC_CallStep" targetRef="CC_Join" />
+    <bpmn:sequenceFlow id="CC_OwnCaseToJoin" sourceRef="CC_CallOwnCase" targetRef="CC_Join" />
+    <bpmn:parallelGateway id="CC_Join">
+      <bpmn:incoming>CC_StepToJoin</bpmn:incoming>
+      <bpmn:incoming>CC_OwnCaseToJoin</bpmn:incoming>
+      <bpmn:outgoing>CC_ToEnd</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:sequenceFlow id="CC_ToEnd" sourceRef="CC_Join" targetRef="CC_End" />
+    <bpmn:endEvent id="CC_End">
+      <bpmn:incoming>CC_ToEnd</bpmn:incoming>
+    </bpmn:endEvent>
+  </bpmn:process>
+  <!-- the step: a secondary process of the caller's workflow service -->
+  <bpmn:process id="CalledStepProcess" isExecutable="true">
+    <bpmn:startEvent id="CST_Start">
+      <bpmn:outgoing>CST_ToDo</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:sequenceFlow id="CST_ToDo" sourceRef="CST_Start" targetRef="CST_Do" />
+    <bpmn:userTask id="CST_Do" name="Do the step of the case" camunda:formKey="doTheStep">
+      <bpmn:incoming>CST_ToDo</bpmn:incoming>
+      <bpmn:outgoing>CST_ToEnd</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="CST_ToEnd" sourceRef="CST_Do" targetRef="CST_End" />
+    <bpmn:endEvent id="CST_End">
+      <bpmn:incoming>CST_ToEnd</bpmn:incoming>
+    </bpmn:endEvent>
+  </bpmn:process>
+  <!-- the case of its own: the primary process of a workflow service with another aggregate -->
+  <bpmn:process id="OwnCaseProcess" isExecutable="true">
+    <bpmn:startEvent id="OC_Start">
+      <bpmn:outgoing>OC_ToCheck</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:sequenceFlow id="OC_ToCheck" sourceRef="OC_Start" targetRef="OC_Check" />
+    <bpmn:userTask id="OC_Check" name="Check the own case" camunda:formKey="checkOwnCase">
+      <bpmn:incoming>OC_ToCheck</bpmn:incoming>
+      <bpmn:outgoing>OC_ToEnd</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="OC_ToEnd" sourceRef="OC_Check" targetRef="OC_End" />
+    <bpmn:endEvent id="OC_End">
+      <bpmn:incoming>OC_ToEnd</bpmn:incoming>
+    </bpmn:endEvent>
+  </bpmn:process>
+</bpmn:definitions>

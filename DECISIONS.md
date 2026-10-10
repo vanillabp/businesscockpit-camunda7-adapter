@@ -45,7 +45,7 @@ no title but a name from the BPMN is more useful than a task which is not there.
 An application upgrading from version 1 will see tasks appear which did not appear before. The wiki
 names it, under what changes for a version 1 application.
 
-## 3. A workflow's lifecycle is read from the engine's history, and only for root instances
+## 3. A workflow's lifecycle is read from the engine's history, and only for root instances - a called process with an aggregate of its own counts as a root since decision 15
 
 The extension learns that a workflow started, ended or was cancelled from a handler for the
 engine's process-instance history events, installed next to the engine's own handler. The
@@ -426,3 +426,50 @@ user tasks get the listeners and are reported, as before.
 Decision 2 says that every user task is reported. That now means every user task of a process of
 kind A. Decision 4 says that a process which is not among the remembered ones is passed over. That
 now includes B.
+
+## 15. A called process with a workflow aggregate of its own is a case of its own
+
+Decision 3 said that only root process instances are reported. That is true only for a called
+process which shares the workflow aggregate of its caller. A called process with an aggregate of its
+own is a business case of its own. The core starts it as a workflow of its own and builds its
+aggregate, the Camunda 7 adapter writes that aggregate's id into the business key, and the cockpit
+now shows it as a case too. This follows decision 61 of `business-cockpit` (story 1472):
+notifications form one group per case, and only a process with its own aggregate forms a group of its
+own.
+
+**The case of an instance** is the highest instance above it which can be reached by calls that
+share the aggregate. The walk goes up the call hierarchy and stops at the first caller which does not
+share it. In a chain Order → Shipping → Packing, where Packing works on Shipping's aggregate and
+Shipping has its own, the case of Packing is Shipping.
+
+**The core decides which processes share an aggregate.** The extension asks
+`WorkflowTaskWiring#workflowsShareTheWorkflowAggregate` with the plain process ids. The Camunda 7
+adapter asks the same question for its call activities (`Camunda7CallActivities`). The extension
+builds no check of its own, and it does not use `BpmsInitiatedStartInvoker#startsAWorkflowOfItsOwn`:
+that answer is `true` for a process nobody declares and says nothing about the caller. A process the
+application does not claim is unknown to the core and shares nothing. So a call from such a process
+starts a case of its own. VanillaBP does not design for processes it did not deploy, so this is
+accepted.
+
+What changes:
+
+- The history handler reports the start and the end of a called instance which does not share its
+  caller's aggregate. A called instance is started without a business key, so its start is reported
+  once the adapter wrote the name, as decision 12 says.
+- A user task names the case as `workflowId`, and the instance it sits in as `subWorkflowId` only
+  where that is another one.
+- `workflowsOfAggregate` keeps a called instance which does not share its caller's aggregate.
+- `userTasksOfAggregate` and `userTaskOfAggregate` answer only tasks of a process which works on the
+  aggregate asked about. The business key alone does not say that: two aggregate classes may count
+  their ids alike, and then a task of a case of its own carried the same key as the caller's case.
+
+**Two ways to walk.** A report at an event walks the executions the engine holds in its running
+command, because an instance started in the same command is not in the history yet. A read outside
+of such a command walks the history, which still knows an instance which ended. The class is
+`Camunda7BusinessCases`. Where the running command does not hold the caller of a history event,
+the instance is taken as a step, which is what every called process was before.
+
+`Camunda7BusinessCasesTest` shows both walks. `Camunda7CalledProcessCaseTest` shows it on an engine:
+one case calls a step on its own aggregate and a process with an aggregate of its own at the same
+time. It also checks the three calls of `BusinessCockpitService` which read VanillaBP's note of the
+start first (`aggregateChanged` twice and `getUserTask`), for both kinds of case.

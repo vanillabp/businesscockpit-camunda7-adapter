@@ -7,6 +7,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 
+import io.vanillabp.integration.adapter.spi.workflowtask.WorkflowTaskWiring;
+
 /**
  * Which BPMN processes of which workflow modules this application deployed and claims, and how
  * to get from an engine's own identifiers back to them.
@@ -32,6 +34,46 @@ public class Camunda7WorkflowProcesses {
    * deployed.
    */
   public Camunda7WorkflowProcesses() {
+
+  }
+
+  /**
+   * The core which wired the processes, which answers whether two of them share a workflow
+   * aggregate. Set by the wiring service, which is the one bean holding both.
+   */
+  private volatile WorkflowTaskWiring core;
+
+  /**
+   * Remembers the core which answers whether two processes share a workflow aggregate.
+   *
+   * @param core VanillaBP's registry of what the application declared
+   */
+  public void rememberTheCore(
+      final WorkflowTaskWiring core) {
+
+    this.core = core;
+
+  }
+
+  /**
+   * Whether a called process works on the workflow aggregate of the process which called it.
+   * The core answers it (<code>WorkflowTaskWiring#workflowsShareTheWorkflowAggregate</code>), the
+   * same answer the Camunda 7 adapter uses for its call activities. Nothing is decided here. See
+   * decision 15 in the repository's DECISIONS.md.
+   *
+   * @param calling The calling process
+   * @param called The called process
+   * @return Whether both share the aggregate. <code>false</code> where the two belong to
+   *         different workflow modules, and where no core was remembered
+   */
+  public boolean shareTheWorkflowAggregate(
+      final WorkflowProcess calling,
+      final WorkflowProcess called) {
+
+    final var theCore = core;
+    return (theCore != null) && calling.workflowModuleId().equals(called.workflowModuleId()) && theCore
+        .workflowsShareTheWorkflowAggregate(calling.workflowModuleId(), calling.bpmnProcessId(), called
+            .bpmnProcessId());
 
   }
 
