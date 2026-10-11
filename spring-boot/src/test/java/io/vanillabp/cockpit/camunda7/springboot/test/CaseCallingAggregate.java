@@ -6,7 +6,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 
 /**
- * The workflow aggregate of a case which calls a step of its own and a case of its own.
+ * The workflow aggregate of a case which calls two processes: one is a step of this case, the
+ * other is a case of its own.
  */
 @Entity
 public class CaseCallingAggregate {

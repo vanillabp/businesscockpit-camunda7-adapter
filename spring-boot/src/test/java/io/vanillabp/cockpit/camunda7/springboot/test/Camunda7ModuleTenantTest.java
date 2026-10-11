@@ -22,16 +22,16 @@ import io.vanillabp.cockpit.extension.test.support.CockpitServer;
 import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 
 /**
- * A workflow module which was given a Camunda tenant of its own.
+ * Tests a workflow module which has a Camunda tenant of its own.
  * <p>
- * A tenant name may be written for one workflow module and for the whole adapter, and the module
- * wins where both are there. Which of the two a module ends up in is decided when the adapter
- * deploys it, and everything the cockpit sends to that engine afterwards has to spell the same
- * name: a query under the wrong tenant answers nothing, and an event of a process stored under
- * one name is never recognized while the extension looks for another.
+ * A tenant name can be set for one workflow module and for the whole adapter. Where both are set,
+ * the module wins. The adapter decides the tenant of a module when it deploys it. After that,
+ * everything the cockpit sends to that engine has to use the same name. A query under the wrong
+ * tenant finds nothing, and an event of a process stored under one name is never recognized if
+ * the extension looks for another.
  * <p>
- * The name here is written at the workflow module and nowhere else, which is the level an
- * extension reading the adapter's section alone cannot see.
+ * Here the name is set at the workflow module and nowhere else. An extension which only reads the
+ * section of the adapter cannot see this level.
  */
 @SpringBootTest(classes = TestApplication.class, properties = {
     "vanillabp.workflow-modules.c7-cockpit.adapters.c7.tenant-id=a-tenant-of-its-own"
@@ -155,9 +155,9 @@ public class Camunda7ModuleTenantTest {
 
     final var aggregate = aStartedWorkflow("Willi");
     userTaskIdOf(aggregate);
-    // named by its customer rather than by its id: every context of this module runs on a
-    // database of its own and counts its cases up from one, so an id alone names a case per
-    // context and the cockpit server is shared by all of them
+    // found by its customer and not by its id. Every context of this module runs on a database
+    // of its own and counts its cases from one. So the same id names a case in each context, and
+    // all of them share the cockpit server
     final var thisCase = "\"customer\":\"Willi\"";
     final var businessId = "\"businessId\":\"%s\"".formatted(aggregate.getId());
 

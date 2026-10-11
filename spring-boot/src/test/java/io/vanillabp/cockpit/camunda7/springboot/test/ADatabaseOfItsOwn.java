@@ -15,15 +15,16 @@ import org.springframework.test.context.MergedContextConfiguration;
  * <p>
  * The embedded engine, the outbox and VanillaBP's table of delivered user tasks
  * <code>VANILLABP_TASK_DELIVERY</code> all live in the application's database. Spring caches the
- * contexts of the test classes, and nothing drops those tables when the next class boots. In one
- * shared database, the job executor of another class's engine runs this class's jobs, and an
- * open record another class left behind for the same aggregate id names a workflow of a case this
- * class never started. That makes a test red depending on the order the classes run in.
+ * contexts of the test classes, and nothing drops those tables when the next class boots. With one
+ * shared database, the job executor of another class's engine runs this class's jobs. Another
+ * class may also leave an open record behind for the same aggregate id, and that record names a
+ * workflow of a case this class never started. Then a test turns red or not, depending on the
+ * order in which the classes run.
  * <p>
  * Spring finds this factory in the test's <code>META-INF/spring.factories</code>, so a new test
  * class gets its own database without asking for it. The test's <code>application.yaml</code>
- * builds the URL from {@link #DATABASE_NAME_KEY} and has no default for it, so a context booted
- * some other way and without a URL of its own does not start, instead of sharing a database.
+ * builds the URL from {@link #DATABASE_NAME_KEY} and has no default for it. So a context which
+ * boots some other way, without a URL of its own, fails to start instead of sharing a database.
  * <p>
  * The Process Engine API adapter names its test databases the same way, through a factory and a
  * key without a default. The Camunda 8 adapter sets no URL at all. It sets

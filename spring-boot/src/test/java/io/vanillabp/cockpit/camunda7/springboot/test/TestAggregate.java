@@ -11,23 +11,23 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Version;
 
 /**
- * The business case of the test: what the workflow is about and what a details provider
+ * The business case of the test: what the workflow is about, and what a details provider
  * changes.
  * <p>
-  * It carries a version attribute, and that is what an application with a writing details
-  * provider is meant to do. The provider runs while a report is dispatched, in the transaction of
-  * that dispatch, so it reads this case long before it writes it back. An application changing
-  * the same case in that window would otherwise lose its change without a word, because the
-  * dispatch writes every field it holds, the older reading among them. With the version attribute
-  * the later of the two writers reads a conflict instead. The application answers it by repeating
-  * its transaction. The dispatch answers it by leaving its outbox entry unfinished, so the report
-  * goes out again from a fresh reading of the case. When that happens is not promised to anybody.
+ * It has a version attribute, as every application with a details provider which writes should
+ * have. The provider runs while a report is dispatched, in the transaction of that dispatch. So it
+ * reads this case long before it writes it back. If the application changes the same case in
+ * that time, its change would be lost without a word, because the dispatch writes every field it
+ * holds, including the old values. With the version attribute, the later of the two writers gets
+ * a conflict instead. The application answers it by repeating its transaction. The dispatch
+ * answers it by leaving its outbox entry unfinished, so the report goes out again from a fresh
+ * reading of the case. Nobody is promised when that happens.
  * <p>
- * {@code signers} travels to the BPMS because a model reads it: the multi-instance task of
+ * {@code signers} is sent to the BPMS because a model reads it: the multi-instance task of
  * {@code MultiInstanceProcess} loops over that list. Only a boolean and a text mean the same in
- * every expression language, so a list is declared under {@code declared-aggregate-values}
- * before it may travel, and {@code application.yaml} does that for every workflow of this
- * aggregate.
+ * every expression language. So a list is only sent after it is declared under
+ * {@code declared-aggregate-values}, and {@code application.yaml} declares it for every workflow
+ * of this aggregate.
  */
 @Entity
 public class TestAggregate {
@@ -37,9 +37,9 @@ public class TestAggregate {
   private Long id;
 
   /**
-   * What the persistence increments per write, and what a second writer runs into. It stays in
-   * the application: no model of this workflow reads it, and the number says nothing a BPMN
-   * model could decide on.
+   * The persistence increments it on every write, and a second writer runs into it. It stays in
+   * the application: no model of this workflow reads it, and a BPMN model could not decide
+   * anything on this number.
    */
   @NoSyncWithBPMS
   @Version

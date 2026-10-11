@@ -13,14 +13,14 @@ import io.vanillabp.cockpit.extension.test.support.CockpitServer;
  * The embedded engine, the outbox and VanillaBP's table of delivered user tasks
  * <code>VANILLABP_TASK_DELIVERY</code> all live in the application's database. The in-memory
  * database stays open until the test JVM ends, and nothing drops those tables when the next test
- * class boots. In one shared database, an open record another class left behind for the same
- * aggregate id names a workflow of a case the next class never started. That makes a test red
- * depending on the order the classes run in.
+ * class boots. With one shared database, a class may leave an open record behind for an aggregate
+ * id. That record names a workflow of a case which the next class with the same aggregate id never
+ * started. Then a test turns red or not, depending on the order in which the classes run.
  * <p>
  * So the database is named after the test class. Every configuration file of this module builds
- * the URL from {@link #DATABASE_NAME_KEY} and has no default for it, so a test class which boots
- * the application some other way does not start, instead of sharing a database. A configuration
- * with two data sources appends a word to the name of each, as
+ * the URL from {@link #DATABASE_NAME_KEY} and has no default for it. So a test class which boots
+ * the application some other way fails to start instead of sharing a database. A configuration
+ * with two data sources adds a word to the name of each, as
  * <code>business-cockpit-own-data-source.yaml</code> does for the application and the engine.
  */
 public final class TestApplication {
@@ -70,9 +70,9 @@ public final class TestApplication {
                 .addClass(TestAggregate.class)
                 .addClass(TestAggregatePersistence.class)
                 .addClass(TestWorkflowService.class)
-                // the test class is initialized twice, once while the application is built and
+                // the test class is initialized twice: once while the application is built, and
                 // again inside the class loader of the running application. Its static field
-                // calls this class, and its assertions use the server class, so the copy inside
+                // calls this class, and its assertions use the server class. So the copy inside
                 // that application needs both
                 .addClass(TestApplication.class)
                 .addClass(CockpitServer.class)))

@@ -29,14 +29,14 @@ import io.vanillabp.integration.adapter.migration.scoping.NameClashAvoidanceServ
 import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 
 /**
- * What the extension contributes to an engine which is about to be built, and what it refuses to
- * be built with.
+ * Tests what the extension adds to an engine which is about to be built, and which engines it
+ * refuses.
  * <p>
-  * The refusal is the interesting half, and it is why these tests build a real engine instead of
-  * asking a configuration double. An application sets the history level in an engine plugin, and
-  * a plugin has its say long after this extension was asked to customize the configuration.
-  * Whether the check ever fires is therefore a question about the order the engine runs its own
-  * hooks in, and only the engine can answer it.
+ * The refusal is the interesting half. It is why these tests build a real engine and do not ask a
+ * configuration double. An application sets the history level in an engine plugin, and a plugin
+ * runs long after this extension customized the configuration. So whether the check ever fires
+ * depends on the order in which the engine runs its own hooks, and only the engine can answer
+ * that.
  */
 @ExtendWith(SuppressOutputExtension.class)
 public class Camunda7EngineCustomizingTest {
@@ -57,8 +57,8 @@ public class Camunda7EngineCustomizingTest {
 
   /**
    * An engine as the Camunda 7 adapter builds it: on its own in-memory database, with the
-   * plugins of the application, and with what this extension contributes applied the way the
-   * adapter's engine holders apply it.
+   * plugins of the application, and with the additions of this extension applied in the same way
+   * as the engine holders of the adapter apply them.
    *
    * @param database A name of its own per test, so a test never meets what another one left
    * @param plugins What the application contributes, e.g. the level it wants
@@ -104,9 +104,9 @@ public class Camunda7EngineCustomizingTest {
   }
 
   /**
-   * What an application which brings a history level of its own writes. Camunda lets one be
-   * registered and named, which is why the extension asks a level what it writes instead of
-   * recognizing the four levels shipped with the engine by name.
+   * What an application which brings a history level of its own writes. Camunda lets an
+   * application register and name its own level. That is why the extension asks a level what it
+   * writes, and does not go by the names of the four levels which come with the engine.
    */
   private record AnApplicationBringing(HistoryLevel level) implements ProcessEnginePlugin {
 
@@ -134,8 +134,9 @@ public class Camunda7EngineCustomizingTest {
   }
 
   /**
-   * A level writing what the engine did to a process instance and nothing about its tasks. An
-   * id of its own, because the engine stores the id of the level its database was created with.
+   * A level which writes what happened to a process instance and nothing about its tasks. It has
+   * an id of its own, because the engine stores the id of the level its database was created
+   * with.
    */
   private record OnlyWhatHappenedToTheProcessInstance() implements HistoryLevel {
 
@@ -252,8 +253,8 @@ public class Camunda7EngineCustomizingTest {
   public void anAutomaticLevelIsJudgedAfterTheEngineResolvedIt() {
 
     final var configuration = anEngineOf("cockpit-history-auto");
-    // 'auto' names no level until the engine has looked into its database, which is after every
-    // plugin has run: a fresh database answers with the engine's default
+    // 'auto' names no level until the engine has looked into its database, and that happens after
+    // every plugin has run. A fresh database answers with the engine's default
     configuration.setHistory("auto");
 
     final var engine = configuration.buildProcessEngine();

@@ -36,9 +36,9 @@ import io.vanillabp.cockpit.extension.test.support.CockpitServer;
 import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 
 /**
- * Two configured Camunda 7 adapter ids side by side, which is what a migration between two
- * engines looks like: each engine gets the cockpit's listeners of its own, each has a bridge of
- * its own, and a workflow which runs on one of them is reported once.
+ * Tests two configured Camunda 7 adapter ids side by side, as in a migration between two
+ * engines. Each engine gets its own cockpit listeners and its own bridge, and a workflow which
+ * runs on one of them is reported once.
  */
 @SpringBootTest(classes = {
     TestApplication.class, Camunda7TwoAdapterIdsTest.SecondEngineConfiguration.class
@@ -52,7 +52,7 @@ public class Camunda7TwoAdapterIdsTest {
 
   /**
    * The datasource the second engine runs on. {@code defaultCandidate = false} keeps it out of
-   * by-type injection, which is the standard pattern for an additional application datasource.
+   * injection by type. That is the usual way to add a second datasource to an application.
    */
   @TestConfiguration
   public static class SecondEngineConfiguration {
@@ -138,7 +138,7 @@ public class Camunda7TwoAdapterIdsTest {
           return workflowService.processes().startWorkflow(aggregate);
         });
 
-    // the two paths below are shared by every case, so the wait says which case it is about
+    // every case uses the two paths below, so the wait names the case it is about
     CockpitServer
         .awaitRequestOf(
             "/usertask/created", "\"businessId\":\"%s\"".formatted(started.getId()));

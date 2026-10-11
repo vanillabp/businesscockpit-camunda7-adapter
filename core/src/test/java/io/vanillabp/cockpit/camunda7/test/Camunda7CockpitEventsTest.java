@@ -44,13 +44,13 @@ import io.vanillabp.integration.adapter.spi.workflowtask.WorkflowTaskWiring;
 import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 
 /**
- * What an engine reports and what the cockpit is told about it, without an engine.
+ * Tests what an engine reports and what the cockpit is told about it, without an engine.
  * <p>
- * The two integration tests of this repository run the happy path through a real engine. What they
- * cannot provoke is the other half: an event of a process this application never deployed, an
- * instance somebody started without a business key, a called process. Those are the cases where the
- * right behaviour is to report nothing, and a test which cannot tell "reported nothing" from "was
- * never asked" would not notice them.
+ * The integration tests of this repository run the happy path through a real engine. They cannot
+ * cause the other cases: an event of a process this application never deployed or nobody claims,
+ * an instance somebody started without a business key, a called process which is a step of its
+ * caller's case. In these cases the right thing is to report nothing. A test which cannot tell
+ * "reported nothing" apart from "was never asked" would not notice them.
  */
 @ExtendWith(SuppressOutputExtension.class)
 public class Camunda7CockpitEventsTest {
@@ -64,10 +64,10 @@ public class Camunda7CockpitEventsTest {
   /** The engine's id of the one deployed process definition of this test. */
   private static final String DEFINITION_ID = "AProcess:4:1";
 
-  /** What the engine counted that deployment as. */
+  /** The version number the engine counted for that deployment. */
   private static final String COUNTED_VERSION = "4";
 
-  /** The tag the modeller gave that deployment, which a reference must NOT carry. */
+  /** The tag the modeller gave that deployment. A reference must NOT carry it. */
   private static final String VERSION_TAG = "release-1";
 
   private RecordingPublisher publisher;
@@ -82,11 +82,11 @@ public class Camunda7CockpitEventsTest {
     publisher = new RecordingPublisher();
     processes = new Camunda7WorkflowProcesses();
     processes.register(MODULE_ID, BPMN_PROCESS_ID);
-    // the real name-clash avoidance of an application which configured none, which resolves to
-    // 'by-adapter': the workflow module is a tenant of its own and the process id stays plain
+    // the real name-clash avoidance of an application which configured none. It resolves to
+    // 'by-adapter': the workflow module is a tenant of its own, and the process id stays plain
     final var scoping = new NameClashAvoidanceService(new MigrationAdapterProperties());
-    // the adapter's own cache of what it deployed, filled the way a deployment fills it: the
-    // extension reads the version from there rather than asking the engine per event
+    // the adapter's own cache of what it deployed, filled the way a deployment fills it. The
+    // extension reads the version from there and does not ask the engine for each event
     final var versions = new Camunda7ProcessVersions(
         ADAPTER_ID, null, (
             workflowModuleId,
@@ -181,8 +181,8 @@ public class Camunda7CockpitEventsTest {
             anInstanceEvent(
                 HistoryEventTypes.PROCESS_INSTANCE_START, MODULE_ID, BPMN_PROCESS_ID, "4711"));
 
-    // the tagged deployment reads 'release-1:4' where an operator sees it, and the cockpit
-    // picks the details provider of a version by what stands here
+    // an operator sees the tagged deployment as 'release-1:4'. The cockpit picks the details
+    // provider of a version by the value checked here
     assertEquals(COUNTED_VERSION, publisher.userTasks().getFirst().processVersion());
     assertEquals(COUNTED_VERSION, publisher.workflows().getFirst().processVersion());
 
@@ -321,8 +321,8 @@ public class Camunda7CockpitEventsTest {
 
     assertTrue(processes.resolve(events.scope(), MODULE_ID, null).isEmpty());
     assertTrue(processes.resolve(events.scope(), null, BPMN_PROCESS_ID).isEmpty());
-    // registering the same process again changes nothing, which is what a second adapter
-    // deploying the same workflow module does
+    // registering the same process again changes nothing. That is what happens when a second
+    // adapter deploys the same workflow module
     processes.register(MODULE_ID, BPMN_PROCESS_ID);
     assertEquals(
         Optional.of(new Camunda7WorkflowProcesses.WorkflowProcess(MODULE_ID, BPMN_PROCESS_ID)),
@@ -465,8 +465,9 @@ public class Camunda7CockpitEventsTest {
 
     assertEquals(1, publisher.userTasks().size());
     final var reported = publisher.userTasks().getFirst();
-    // the details provider of the task is picked by this pair, see decision 16 of the repository's
-    // DECISIONS.md. The task belongs to the model of the called process, so its version counts
+    // the details provider of the task is picked by this pair, see decision 16 in the
+    // DECISIONS.md of this repository. The task belongs to the model of the called process, so
+    // that version counts
     assertEquals(called, reported.bpmnProcessId());
     assertEquals("2", reported.processVersion());
     // and the case is still the caller's

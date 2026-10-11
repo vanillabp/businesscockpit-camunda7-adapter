@@ -46,13 +46,13 @@ import io.vanillabp.integration.adapter.migration.scoping.NameClashAvoidanceServ
 import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 
 /**
- * What the bridge answers while an event is being reported, without an engine.
+ * Tests what the bridge answers while an event is being reported, without an engine.
  * <p>
- * The integration tests of this repository run the same thing through a real engine, and they run
- * it on the happy path. What is asserted here is the rule itself: while a listener reports an
- * event, the answer comes out of that event and the engine is not asked at all. An engine which
- * WAS asked would answer nothing at that moment, because the command it is in has not written its
- * history yet, and that is exactly the failure this class guards against.
+ * The integration tests of this repository run the same through a real engine, but only on the
+ * happy path. This class asserts the rule itself: while a listener reports an event, the answer
+ * comes out of that event, and the engine is not asked at all. If the engine WERE asked, it would
+ * answer nothing at that moment, because the command it runs in has not written its history yet.
+ * That is the failure this class guards against.
  */
 @ExtendWith(SuppressOutputExtension.class)
 public class Camunda7PrefillAtTheEventTest {
@@ -66,10 +66,10 @@ public class Camunda7PrefillAtTheEventTest {
   /** The engine's id of the one deployed process definition of this test. */
   private static final String DEFINITION_ID = "AProcess:4:1";
 
-  /** What the engine counted that deployment as. */
+  /** The version number the engine counted for that deployment. */
   private static final String COUNTED_VERSION = "4";
 
-  /** The tag the modeller gave it, which is part of the version a person reads. */
+  /** The tag the modeller gave it. It is part of the version a person reads. */
   private static final String VERSION_TAG = "release-1";
 
   private static final String INSTANCE_ID = "the-instance";
@@ -110,8 +110,8 @@ public class Camunda7PrefillAtTheEventTest {
   }
 
   /**
-   * An engine which answers nothing but runs the commands it is given, which is what the way
-   * through the query does. Every test below either asserts that it was never asked, or asks it
+   * An engine which answers no query but runs the commands it is given, which the way through
+   * the query needs. Every test below either asserts that the engine was never asked, or asks it
    * on purpose.
    */
   private ProcessEngine anEngine() {
@@ -229,8 +229,9 @@ public class Camunda7PrefillAtTheEventTest {
           assertEquals(INSTANCE_ID, prefill.workflowId());
           assertNull(prefill.subWorkflowId(), "a task of a root instance named a called workflow");
           assertEquals("4711", prefill.businessId());
-          // no initiator, and nothing in its place: what an initiator of a user task should say
-          // is not this adapter's question - see decision 10 in the repository's DECISIONS.md
+          // no initiator, and nothing in its place. What the initiator of a user task should be
+          // is not for this adapter to decide, see decision 10 in the DECISIONS.md of this
+          // repository
           assertNull(prefill.initiator(), "a user task was reported with an initiator");
           assertEquals("anna", prefill.assignee());
           assertEquals(List.of("approvers"), prefill.candidateGroups());
@@ -325,7 +326,8 @@ public class Camunda7PrefillAtTheEventTest {
   public void theEventIsGoneAfterwards() {
 
     eventBeingReported.whileReporting(aTaskOfTheEvent(), () -> {
-      // reported inside, so the nested report has to find its own event again afterwards
+      // a report inside a report: the inner one hides the outer event, and afterwards the outer
+      // report has to find its own event again
       eventBeingReported
           .whileReporting(
               anInstanceEvent(HistoryEventTypes.PROCESS_INSTANCE_START),

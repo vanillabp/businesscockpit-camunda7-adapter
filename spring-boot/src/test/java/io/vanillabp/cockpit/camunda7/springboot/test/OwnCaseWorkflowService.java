@@ -17,8 +17,8 @@ import io.vanillabp.spi.service.WorkflowService;
 import io.vanillabp.spi.service.WorkflowStartedByBpms;
 
 /**
- * A process which another case calls by a call activity, with a workflow aggregate of its own.
- * So it is a case of its own, and the engine starts it: this service builds its aggregate.
+ * A process which another case calls through a call activity. It has a workflow aggregate of its
+ * own, so it is a case of its own. The engine starts it, and this service builds its aggregate.
  */
 @Service
 @WorkflowService(workflowAggregateClass = OwnCaseAggregate.class,
@@ -31,7 +31,7 @@ public class OwnCaseWorkflowService {
   /** The form key of its user task. */
   public static final String TASK_DEFINITION = "checkOwnCase";
 
-  /** What both providers write the customer into, so a test finds the reports of this case. */
+  /** The detail both providers put the customer in, so a test finds the reports of this case. */
   public static final String OWN_CASE = "ownCase";
 
   private final BusinessCockpitService<OwnCaseAggregate> businessCockpitService;
@@ -53,7 +53,7 @@ public class OwnCaseWorkflowService {
   }
 
   /**
-   * Builds the aggregate of a case the call activity started.
+   * Builds the aggregate of a case which the call activity started.
    *
    * @param callersId The id of the calling case, which the call activity hands over
    * @return The new case, which gets its id when it is saved
@@ -70,7 +70,7 @@ public class OwnCaseWorkflowService {
 
   /**
    * @param callersId The id of the calling case
-   * @return What the case of its own started by that caller is called
+   * @return The customer of the case which that caller started
    */
   public static String customerOf(
       final String callersId) {

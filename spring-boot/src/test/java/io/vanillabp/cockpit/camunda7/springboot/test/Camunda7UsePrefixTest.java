@@ -24,13 +24,13 @@ import io.vanillabp.cockpit.extension.test.support.CockpitServer;
 import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 
 /**
- * A workflow module deployed with prefixed identifiers, which is the name-clash avoidance
+ * Tests a workflow module deployed with prefixed identifiers, which is the name-clash avoidance
  * <code>use-prefix</code>.
  * <p>
- * The engine then knows the process under a name the application never wrote, and it knows no
- * tenant which would tell one workflow module from another. Both are things the cockpit must
- * not inherit: it reports the process id the application wrote, and it answers a question about
- * one workflow module with the tasks of that module alone.
+ * The engine then knows the process under a name the application never wrote. It also has no
+ * tenant which tells one workflow module from another. The cockpit must not take over either of
+ * them. It reports the process id the application wrote, and it answers a question about one
+ * workflow module only with the tasks of that module.
  */
 @SpringBootTest(classes = TestApplication.class, properties = {
     "vanillabp.adapters.c7.name-clash-avoidance=use-prefix"
@@ -105,10 +105,10 @@ public class Camunda7UsePrefixTest {
   }
 
   /**
-   * The report about this test's own case, told apart from whatever a context of another test
-   * class reports to the same server while this one waits. The case is named by its customer
-   * rather than by its id: every context of this module runs on a database of its own and
-   * counts its cases up from one, so an id alone names a case per context.
+   * Waits for the report about the case of this test. Contexts of other test classes may report
+   * to the same server while this one waits. So the case is found by its customer and not by its
+   * id: every context of this module runs on a database of its own and counts its cases from one,
+   * so the same id names a case in each context.
    *
    * @param pathSuffix What the path of the report ends with
    * @param customer The case this test started
@@ -159,7 +159,7 @@ public class Camunda7UsePrefixTest {
     userTaskIdOf(aggregate);
 
     // the engine really deployed it under a name the application never wrote, and under no
-    // tenant: this mode is the one where an id has to be translated back rather than passed on
+    // tenant. In this mode an id has to be translated back and cannot just be passed on
     final var deployed = engine
         .getRepositoryService()
         .createProcessDefinitionQuery()
@@ -200,8 +200,8 @@ public class Camunda7UsePrefixTest {
     assertEquals(1, ownTasks.size(), ownTasks.toString());
     assertEquals(userTaskId, ownTasks.getFirst().userTaskId());
 
-    // no tenant separates the workflow modules in this mode, so the engine answers this query
-    // with the very same task, and a module which did not deploy that process must not get it
+    // in this mode no tenant separates the workflow modules, so the engine answers this query
+    // with the same task. A module which did not deploy that process must not get it
     assertEquals(
         List.of(),
         bridge()

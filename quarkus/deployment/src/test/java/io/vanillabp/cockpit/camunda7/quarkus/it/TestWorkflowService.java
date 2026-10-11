@@ -21,8 +21,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 /**
- * The application under test: a workflow whose user task the cockpit is to show, the Quarkus
- * twin of the Spring Boot module's test application.
+ * The workflow service of the application under test. It claims the processes whose user tasks
+ * the cockpit shows. It is the Quarkus twin of the workflow service in the Spring Boot module.
  */
 @ApplicationScoped
 @WorkflowService(workflowAggregateClass = TestAggregate.class,
@@ -37,15 +37,15 @@ public class TestWorkflowService {
   /** The BPMN process of the test. */
   public static final String BPMN_PROCESS_ID = "CockpitProcess";
 
-  /** The form key of the user task, which is what the cockpit calls its task definition. */
+  /** The form key of the user task. The cockpit calls it the task definition. */
   public static final String TASK_DEFINITION = "approve";
 
   /** The BPMN element id of the user task. */
   public static final String BPMN_TASK_ID = "Approve";
 
   /**
-   * What the engine counted the one deployment of these models as. A reference the test builds
-   * itself carries it, so it says what a reference the extension built would say.
+   * The version number the engine counted for the one deployment of these models. A reference
+   * which the test builds itself carries it, so it matches a reference built by the extension.
    */
   public static final String DEPLOYED_VERSION = "1";
 
@@ -55,10 +55,10 @@ public class TestWorkflowService {
   /** The form key of the multi-instance user task. */
   public static final String SIGN_TASK_DEFINITION = "sign";
 
-  /** The BPMN element the multi-instance context is keyed by. */
+  /** The BPMN element which is the key of the multi-instance context. */
   public static final String MULTI_INSTANCE_ELEMENT = "MI_Sign";
 
-  /** The variable each instance of the multi-instance task gets its signer in. */
+  /** The variable in which each instance of the multi-instance task gets its signer. */
   public static final String SIGNER_VARIABLE = "signer";
 
   /** The BPMN process whose call activity names the process it calls in an expression. */
@@ -68,9 +68,9 @@ public class TestWorkflowService {
   public static final String CALLED_SIGN_PROCESS_ID = "CalledSignProcess";
 
   /**
-   * The BPMN element of the call activity, which is the only multi-instance element of that
-   * pair. It sits in the CALLING model, so the user task of the called process reports a level
-   * its own model does not carry.
+   * The BPMN element of the call activity. It is the only multi-instance element of the two
+   * models, and it sits in the CALLING model. So the user task of the called process reports a
+   * level which its own model does not have.
    */
   public static final String CALL_ACTIVITY_ELEMENT = "EC_Call";
 
@@ -80,19 +80,19 @@ public class TestWorkflowService {
   /** The BPMN element id of that user task. */
   public static final String CALLER_SIGN_TASK_ID = "CS_Sign";
 
-  /** The variable the call activity reads the process to call from. */
+  /** The variable from which the call activity reads the process to call. */
   public static final String CALLED_PROCESS_VARIABLE = "calledProcess";
 
   /**
-   * A variable of the process instance rather than of one multi-instance execution: what a
-   * <code>&#64;TaskParam</code> of an enclosing scope is bound from.
+   * A variable of the process instance, not of one multi-instance execution. A
+   * <code>&#64;TaskParam</code> of an enclosing scope is bound from it.
    */
   public static final String ORDER_KIND_VARIABLE = "orderKind";
 
   /** What the details provider writes into the aggregate, so that a test can see it ran. */
   public static final String APPROVE_NOTE = "seen by the details provider";
 
-  /** The detail every provider below writes, so that a test can read which of them ran. */
+  /** The detail every provider below writes, so that a test can see which of them ran. */
   public static final String SERVED_BY = "servedBy";
 
   /** What the provider serving the first deployed model writes into the details of its task. */
@@ -146,8 +146,8 @@ public class TestWorkflowService {
   }
 
   /**
-   * The same task as every model deployed after the first asks for it. The two ranges do not
-   * overlap, which is what lets both methods name the same task.
+   * The same task as every model deployed after the first one asks for it. The two version
+   * ranges do not overlap, so both methods may name the same task.
    *
    * @param prefilled What the engine knew about the task
    * @return The enriched details
@@ -198,10 +198,10 @@ public class TestWorkflowService {
 
   /**
    * The user task of the called process, as the COCKPIT shows it. Its parameters name the call
-   * activity of the CALLING model, which is where the only iteration of this pair sits, so the
-   * bridge has to have crossed that call activity for them to be answered at all. A level the
-   * bridge does not report is no missing value here: naming one which was not supplied ends the
-   * report, and with it the transaction creating the task.
+   * activity of the CALLING model, because the only loop of the two models sits there. So the
+   * bridge has to cross that call activity to answer them at all. Here a level the bridge does not
+   * report is not just a missing value: naming a level which was not supplied ends the report,
+   * and with it the transaction which creates the task.
    *
    * @param prefilled What the engine reported about the task
    * @param signer The item of the round the caller is in
@@ -250,8 +250,8 @@ public class TestWorkflowService {
   }
 
   /**
-   * The same workflow as every model deployed after the first asks for it. A workflow provider
-   * stands for the whole BPMN process, so the version is the only thing telling these two apart.
+   * The same workflow as every model deployed after the first one asks for it. A workflow
+   * provider stands for the whole BPMN process, so only the version tells these two apart.
    *
    * @param prefilled What the engine knew about the workflow
    * @return The enriched details

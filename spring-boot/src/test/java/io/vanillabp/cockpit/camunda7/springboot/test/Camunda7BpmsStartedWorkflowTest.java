@@ -26,24 +26,24 @@ import io.vanillabp.cockpit.extension.test.support.CockpitServer;
 import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 
 /**
- * A workflow the engine starts by itself reaches the cockpit as a new case, like a workflow the
- * application starts.
+ * Tests that a workflow which the engine starts by itself reaches the cockpit as a new case, like
+ * a workflow which the application starts.
  * <p>
  * A signal, a timer or a message correlated past VanillaBP starts a process instance without a
  * business key. The engine writes its start into the history at that moment, and the cockpit has
  * no workflow aggregate to report it for. The Camunda 7 adapter then asks the application to
- * build the aggregate and writes its id into the business key. For the engine that is a change of
- * the process instance, and it would reach the cockpit as an update. The cockpit server would
+ * build the aggregate, and writes its id into the business key. For the engine, that is a change
+ * of the process instance, and it would reach the cockpit as an update. The cockpit server would
  * still create the case from it, but with the time of the update as its start.
  * <p>
- * A signal is the trigger here because the test can send it the moment it wants to. A timer
+ * The trigger here is a signal, because the test can send it at the moment it wants. A timer
  * start would fire in every context of this module which deploys the model.
  */
 @SpringBootTest(classes = TestApplication.class)
 @ExtendWith(SuppressOutputExtension.class)
 @SuppressOutputExtension.SuppressBackgroundOutput
-// closed when the class is done: an engine outliving its test keeps its job executor running
-// against a database the next class works on
+// closed when the class is done: an engine which outlives its test keeps its job executor
+// running against a database the next class works on
 @DirtiesContext
 public class Camunda7BpmsStartedWorkflowTest {
 
@@ -74,9 +74,9 @@ public class Camunda7BpmsStartedWorkflowTest {
   }
 
   /**
-   * Every report about the workflow of one case, once nothing more arrives. The server is shared
-   * by every test class of this module, and each class counts its ids up from one. So a report is
-   * recognized by the customer of the case as well, which is unique per test.
+   * Every report about the workflow of one case, once nothing more arrives. Every test class of
+   * this module shares the server, and each class counts its ids from one. So a report is also
+   * recognized by the customer of the case, which is unique per test.
    *
    * @param workflowId The process instance of the case
    * @param businessId The id of its workflow aggregate
@@ -120,7 +120,7 @@ public class Camunda7BpmsStartedWorkflowTest {
   }
 
   /**
-   * The process instance of a case the application started. VanillaBP starts it once the
+   * The process instance of a case which the application started. VanillaBP starts it after the
    * transaction which saved the case has committed, so it may not be there at once.
    *
    * @param businessId The id of the workflow aggregate

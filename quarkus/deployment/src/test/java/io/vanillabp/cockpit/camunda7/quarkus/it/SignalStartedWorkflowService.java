@@ -26,7 +26,7 @@ public class SignalStartedWorkflowService {
   /** The name of the signal which starts that process. */
   public static final String START_SIGNAL = "cockpitStartSignal";
 
-  /** The variable the signal carries the customer of the new case in. */
+  /** The variable in which the signal carries the customer of the new case. */
   public static final String CUSTOMER_VARIABLE = "customer";
 
   /**

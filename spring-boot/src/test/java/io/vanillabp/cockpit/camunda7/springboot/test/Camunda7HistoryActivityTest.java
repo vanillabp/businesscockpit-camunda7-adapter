@@ -28,17 +28,17 @@ import io.vanillabp.cockpit.extension.test.support.CockpitServer;
 import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 
 /**
- * An application whose engine keeps the least history the cockpit can work with.
+ * Tests an application whose engine keeps the least history the cockpit can work with.
  * <p>
-  * Camunda's <code>activity</code> writes what happened to a process instance, which is what the
-  * cockpit reads. What the levels above it add is task, variable and form-property history, and
-  * none of that is asked for. So an application which lowered its engine to it gets a cockpit
-  * which works. This test walks the whole way to prove it: a workflow starts, its task appears,
-  * both are reported, and both are reported again when the task is completed.
+ * The Camunda level <code>activity</code> writes what happened to a process instance, and that
+ * is what the cockpit reads. The levels above it add the history of tasks, variables and form
+ * properties, and the cockpit needs none of it. So the cockpit works for an application which set
+ * its engine to this level. This test goes the whole way to prove it: a workflow starts, its task
+ * appears, both are reported, and both are reported again when the task is completed.
  * <p>
-  * A task carries as much at this level as at any other. Everything the cockpit shows about it
-  * comes off the task the engine handed to the listener, and the candidates of a task do too.
-  * That is asserted here, because at this level there is no history of a task to fall back on.
+ * A task carries as much at this level as at any other. Everything the cockpit shows about it
+ * comes from the task which the engine handed to the listener, and so do the candidates of the
+ * task. This test asserts it, because at this level there is no task history to fall back on.
  */
 @SpringBootTest(classes = {
     TestApplication.class, Camunda7HistoryActivityTest.AnEngineKeepingTheLeastThatWorks.class
@@ -51,9 +51,9 @@ public class Camunda7HistoryActivityTest {
   private static final String MODULE_ID = "c7-cockpit";
 
   /**
-   * How an application asks for a history level of its own: the level is neither a key of this
-   * extension nor one of the Camunda 7 adapter, and a customizer is one of the two ways to the
-   * engine configuration the message of the boot check names.
+   * How an application asks for a history level of its own. The level is not a key of this
+   * extension, and not one of the Camunda 7 adapter. The message of the boot check names two ways
+   * into the engine configuration, and a customizer is one of them.
    */
   @TestConfiguration
   public static class AnEngineKeepingTheLeastThatWorks {
@@ -153,11 +153,11 @@ public class Camunda7HistoryActivityTest {
   }
 
   /**
-   * The report of this test's own workflow. The cockpit server is shared by every test class of
-   * this module, so a report is told from another one's by what it carries rather than by being
-   * the only one which arrived. What tells them apart is the case, not its id: every context of
-   * this module runs on a database of its own and counts its cases up from one, so an id alone
-   * names a case per context.
+   * Waits for the report about the workflow of this test. Every test class of this module shares
+   * the cockpit server. So a report is recognized by what it carries, not by being the only one
+   * which arrived. The case tells them apart, not its id: every context of this module runs on a
+   * database of its own and counts its cases from one, so the same id names a case in each
+   * context.
    *
    * @param pathSuffix What the path of the report ends with
    * @param carrying What its body has to contain
@@ -227,7 +227,7 @@ public class Camunda7HistoryActivityTest {
     assertTrue(
         userTask.contains("\"taskDefinition\":\"%s\"".formatted(TestWorkflowService.TASK_DEFINITION)),
         userTask);
-    // the details provider ran, which means the task's variables were readable at this level
+    // the details provider ran, so the variables of the task could be read at this level
     assertTrue(userTask.contains(thisCase), userTask);
 
     engine.getTaskService().complete(userTaskId);
@@ -245,8 +245,8 @@ public class Camunda7HistoryActivityTest {
     final var userTaskId = userTaskIdOf(aggregate);
     final var thisCase = "\"customer\":\"Rudi\"";
 
-    // while the task runs the engine holds its identity links, and a question of the
-    // application reads them there
+    // while the task runs, the engine holds its identity links, and a query of the application
+    // reads them there
     engine.getTaskService().addCandidateGroup(userTaskId, "auditors");
     assertEquals(
         List.of("auditors"),
@@ -258,8 +258,8 @@ public class Camunda7HistoryActivityTest {
     engine.getTaskService().complete(userTaskId);
 
     // the report of the completion was built while the task was still there. Afterwards there
-    // is nothing left to read: this level writes no task history, and the engine holds no
-    // finished task
+    // is nothing left to read: this level writes no task history, and the engine does not keep
+    // a finished task
     final var completed = awaitReport("/usertask/%s/completed".formatted(userTaskId), thisCase);
     assertTrue(completed.contains("\"event\":\"COMPLETED\""), completed);
     assertTrue(
