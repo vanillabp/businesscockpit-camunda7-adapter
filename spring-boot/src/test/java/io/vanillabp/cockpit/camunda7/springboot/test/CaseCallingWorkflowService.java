@@ -34,7 +34,7 @@ public class CaseCallingWorkflowService {
   /** The form key of the user task of that step. */
   public static final String STEP_TASK_DEFINITION = "doTheStep";
 
-  /** What both providers write the customer into, so a test finds the reports of this case. */
+  /** The detail both providers put the customer in, so a test finds the reports of this case. */
   public static final String CALLER = "caller";
 
   private final ProcessService<CaseCallingAggregate> processService;

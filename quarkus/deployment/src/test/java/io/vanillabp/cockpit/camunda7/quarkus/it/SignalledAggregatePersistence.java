@@ -8,8 +8,8 @@ import io.vanillabp.integration.spi.AggregatePersistenceAware;
 import jakarta.enterprise.context.ApplicationScoped;
 
 /**
- * Where the test application keeps the workflow aggregates of the cases a signal started. It is in
- * memory, like {@link TestAggregatePersistence}.
+ * Keeps the workflow aggregates of the cases which a signal started. It keeps them in memory, like
+ * {@link TestAggregatePersistence}.
  */
 @ApplicationScoped
 public class SignalledAggregatePersistence implements AggregatePersistenceAware<SignalledAggregate> {

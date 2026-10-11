@@ -5,11 +5,11 @@ import java.util.List;
 /**
  * The business case of the test: what the workflow is about.
  * <p>
- * {@code signers} travels to the BPMS because a model reads it: the multi-instance task of
+ * {@code signers} is sent to the BPMS because a model reads it: the multi-instance task of
  * {@code MultiInstanceProcess} loops over that list. Only a boolean and a text mean the same in
- * every expression language, so a list is declared under {@code declared-aggregate-values}
- * before it may travel, and the configuration of this test application does that for every
- * workflow.
+ * every expression language. So a list is only sent after it is declared under
+ * {@code declared-aggregate-values}. The configuration of this test application declares it for
+ * every workflow.
  */
 public class TestAggregate {
 

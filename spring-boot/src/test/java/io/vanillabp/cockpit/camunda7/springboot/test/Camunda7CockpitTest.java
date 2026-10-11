@@ -41,42 +41,42 @@ import io.vanillabp.cockpit.extension.test.support.CockpitServer;
 import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 
 /**
- * The Business Cockpit on a real embedded Camunda 7 engine, from what the engine did to the
+ * Tests the Business Cockpit on a real embedded Camunda 7 engine, from what the engine did to the
  * request the cockpit server receives.
  * <p>
- * Nothing on that way is faked but the cockpit server itself: the engine runs the workflow, its
- * built-in task listeners and its history handler report what happened, the report is built out
- * of that event and the application's details provider runs on it, the outbox entry carrying it
- * is written inside the engine's own transaction, and what arrives at the server once that
- * transaction committed is asserted.
+ * Only the cockpit server is faked. The engine runs the workflow. Its built-in task listeners and
+ * its history handler report what happened. The report is built from that event, and the
+ * application's details provider runs on it. The outbox entry which carries the report is written
+ * inside the engine's own transaction. The test asserts what arrives at the server once that
+ * transaction has committed.
  */
 @SpringBootTest(classes = TestApplication.class)
 @ExtendWith(SuppressOutputExtension.class)
 @SuppressOutputExtension.SuppressBackgroundOutput
-// closed when the class is done: an engine outliving its test keeps its job executor running
-// against a database the next class works on
+// closed when the class is done: an engine which outlives its test keeps its job executor
+// running against a database the next class works on
 @DirtiesContext
 public class Camunda7CockpitTest {
 
   private static final String MODULE_ID = "c7-cockpit";
 
   /**
-   * Who the one test about a refused report assigns its task to. The cockpit server is shared by
-   * every test class of this module, and a report is told apart from another one's by what it
-   * carries. So this name belongs to that test and to no other.
+   * The user to whom the test about a refused report assigns its task. Every test class of this
+   * module shares the cockpit server, and a report is recognized by what it carries. So only that
+   * test uses this name.
    */
   private static final String THE_ASSIGNEE_OF_THIS_TEST = "quirins-approver";
 
   /**
-   * How often the application repeats a transaction which read a conflict. Two would do for the
-   * one other writer there is; the third is there so that a repetition which itself meets the
-   * next report does not end the test.
+   * How often the application repeats a transaction which ran into a conflict. Two would be
+   * enough for the one other writer. The third makes sure that a repetition which itself runs into
+   * the next report does not end the test.
    */
   private static final int ATTEMPTS_OF_THE_APPLICATION = 3;
 
   /**
-   * The two rounds the caller of the expression-named call activity runs, one string apiece, so
-   * that both ways into the bridge are compared as values.
+   * The two rounds which the caller of the expression-named call activity runs, one string each.
+   * So both ways into the bridge are compared as values.
    */
   private static final Set<String> THE_TWO_ROUNDS_OF_THE_CALLER = Set.of("anna#0/2", "bert#1/2");
 
@@ -111,15 +111,15 @@ public class Camunda7CockpitTest {
   }
 
   /**
-   * Changes one case and reports the change, the way an application whose workflow aggregate
-   * carries a version attribute has to do it: in a transaction which is repeated where somebody
-   * else wrote the same case in between.
+   * Changes one case and reports the change, as an application whose workflow aggregate has a
+   * version attribute has to do it: in a transaction which is repeated if somebody else wrote the
+   * same case in between.
    * <p>
    * That somebody is the Business Cockpit itself. Its details provider reads the case whenever
-   * the engine reports something, and it writes the case back. Where that report happens on a
-   * thread of the engine, a job executor above all, the two transactions overlap. Without the
-   * version attribute the later of the two writers wins silently; with it, one of them reads a
-   * conflict and repeats.
+   * the engine reports something, and it writes the case back. If that report runs on a thread of
+   * the engine, above all a job executor, the two transactions overlap. Without the version
+   * attribute, the later writer wins without a word. With it, one of them gets a conflict and
+   * repeats.
    *
    * @param aggregateId The case to change
    * @param changeAndReport Changes the attached case and reports it to the cockpit
@@ -151,9 +151,9 @@ public class Camunda7CockpitTest {
   /**
    * Waits for a report of one kind which carries the value the application wrote.
    * <p>
-   * A report carrying the older value has two possible causes and they need different work: the
-   * report read the case too early, or the case itself lost the change. So a failure names what
-   * the case carries now as well - see the version attribute of {@link TestAggregate}.
+   * A report with the older value has two possible causes, and each needs a different fix: the
+   * report read the case too early, or the case itself lost the change. So a failure also names
+   * what the case holds now. See the version attribute of {@link TestAggregate}.
    *
    * @param pathSuffix What the report's path has to end with
    * @param expected What its body has to carry
@@ -195,9 +195,9 @@ public class Camunda7CockpitTest {
   }
 
   /**
-   * What the reports of one case carry and the reports of every other case do not. The paths
-   * {@code /workflow/created} and {@code /usertask/created} are shared by every case, so a wait
-   * on one of them has to say which case it is about.
+   * What the reports of one case carry and the reports of all other cases do not. Every case
+   * reports on the paths {@code /workflow/created} and {@code /usertask/created}, so a wait on one
+   * of them has to say which case it is about.
    *
    * @param aggregate The case under test
    * @return What a report of that case carries
@@ -253,7 +253,7 @@ public class Camunda7CockpitTest {
   }
 
   /**
-   * When a report says its user task was created. Only the report of an end carries it.
+   * When the report says its user task was created. Only the report of an end carries this.
    *
    * @param report The report as the cockpit server received it
    * @return The time the report names, as an instant
@@ -288,9 +288,9 @@ public class Camunda7CockpitTest {
     final var aggregate = aStartedWorkflow("Anna");
     userTaskIdOf(aggregate);
 
-    // both reports are awaited by the id of this case: '/workflow/created' and
-    // '/usertask/created' are paths every case reports on, so waiting on the path alone
-    // takes whichever report arrived first and asserts against a case nobody asked about
+    // both reports are awaited by the id of this case. Every case reports on '/workflow/created'
+    // and '/usertask/created'. Waiting on the path alone takes whichever report arrived first,
+    // and then asserts against a case nobody asked about
     final var thisCase = reportsOf(aggregate);
 
     final var workflow = CockpitServer.awaitRequest("/workflow/created", thisCase);
@@ -304,14 +304,14 @@ public class Camunda7CockpitTest {
         userTask.body().contains("\"taskDefinition\":\"%s\"".formatted(TestWorkflowService.TASK_DEFINITION)),
         userTask.body());
     assertTrue(userTask.body().contains("\"candidateGroups\":[\"approvers\"]"), userTask.body());
-    // the BPMN name is what the cockpit falls back to when nothing else produced a title
+    // the cockpit falls back to the BPMN name when nothing else gave a title
     assertTrue(userTask.body().contains("Approve the order"), userTask.body());
 
-    // The customer in that body is what the details provider read off the case, so the report
-    // shows that the provider ran on the real aggregate. Whether the case KEEPS what that
-    // provider wrote into it is not asserted, on purpose. The write rides the transaction the
-    // engine reported in, and that transaction can still be rolled back by whoever is in it.
-    // The entry would then be gone with it, and so would the write.
+    // The details provider read the customer in that body from the case. So the report shows
+    // that the provider ran on the real aggregate. Whether the case KEEPS what the provider wrote
+    // into it is not asserted, on purpose. The write is part of the transaction the engine
+    // reported in, and whoever runs that transaction can still roll it back. Then the entry is
+    // gone, and so is the write.
 
   }
 
@@ -328,7 +328,7 @@ public class Camunda7CockpitTest {
     final var created = creationOf(userTaskId);
     engine.getTaskService().complete(userTaskId);
 
-    // the report of an end says when its task was created, for the cockpit which gets the end
+    // the report of an end says when its task was created, for a cockpit which gets the end
     // before the creation
     final var task = CockpitServer.awaitAnyRequest("/usertask/%s/completed".formatted(userTaskId));
     assertEquals(created, startNamedBy(task), task.body());
@@ -369,8 +369,8 @@ public class Camunda7CockpitTest {
     CockpitServer.awaitRequestOf("/usertask/created", reportsOf(aggregate));
     CockpitServer.forgetRequests();
 
-    // nothing of VanillaBP is involved here: this is what a task list or the Camunda web
-    // application does, and the cockpit has to hear about it
+    // VanillaBP is not involved here. A task list or the Camunda web application does this, and
+    // the cockpit has to hear about it
     engine.getTaskService().setAssignee(userTaskId, "anna");
 
     final var updated = CockpitServer.awaitAnyRequest("/usertask/%s/updated".formatted(userTaskId));
@@ -395,9 +395,9 @@ public class Camunda7CockpitTest {
           workflowService.businessCockpit().aggregateChanged(attached);
         });
 
-    // the report carries what the application wrote, not what the case said before it. It is
-    // built inside this very transaction, so the details provider reads the case the application
-    // has just changed and has not written yet
+    // the report carries what the application wrote, not the old value of the case. It is built
+    // inside this transaction, so the details provider reads the case which the application has
+    // just changed but not written yet
     awaitReportCarrying(
         "/workflow/%s/updated".formatted(workflowId), "Emil the second", aggregate);
 
@@ -508,14 +508,14 @@ public class Camunda7CockpitTest {
           fresh.setSigners(List.of("anna", "bert", "cleo"));
           return aggregates.save(fresh);
         });
-    // started through the engine rather than through VanillaBP: the multi-instance process is a
-    // secondary process of this aggregate, and what is under test is what the listener reports
+    // started through the engine and not through VanillaBP: the multi-instance process is a
+    // secondary process of this aggregate, and the test is about what the listener reports
     engine
         .getRuntimeService()
         .createProcessInstanceByKey(TestWorkflowService.MULTI_INSTANCE_PROCESS_ID)
         .processDefinitionTenantId(MODULE_ID)
         .businessKey(String.valueOf(aggregate.getId()))
-        // a variable of the process instance, which the multi-instance executions run below
+        // a variable of the process instance, which is the parent of the multi-instance executions
         .setVariable(TestWorkflowService.ORDER_KIND_VARIABLE, "express")
         .execute();
 
@@ -526,8 +526,8 @@ public class Camunda7CockpitTest {
         bodies.stream().anyMatch(body -> body.contains("\"signer\":\"cleo\"")), bodies.toString());
     bodies.forEach(body -> assertTrue(body.contains("\"total\":\"3\""), body));
 
-    // '@TaskParam' is bound from every variable the task can see: the one its own execution
-    // holds and the one of the process instance enclosing it
+    // '@TaskParam' is bound from every variable the task can see: the one of its own execution,
+    // and the one of the enclosing process instance
     assertTrue(
         bodies.stream().anyMatch(body -> body.contains("\"signerVariable\":\"anna\"")),
         bodies.toString());
@@ -536,8 +536,8 @@ public class Camunda7CockpitTest {
   }
 
   /**
-   * A case whose caller iterates over its signers and calls the signing process once per round,
-   * naming that process in an expression.
+   * Starts a case whose caller loops over its signers and calls the signing process once per
+   * round. The call activity names that process in an expression.
    *
    * @param customer What the case is called
    * @return The saved case, whose id is the business key of every instance started here
@@ -557,7 +557,7 @@ public class Camunda7CockpitTest {
         .createProcessInstanceByKey(TestWorkflowService.EXPRESSION_CALL_PROCESS_ID)
         .processDefinitionTenantId(MODULE_ID)
         .businessKey(String.valueOf(aggregate.getId()))
-        // what the deployment could not read: the process to call is chosen per instance
+        // the deployment could not read this: each instance chooses the process to call
         .setVariable(
             TestWorkflowService.CALLED_PROCESS_VARIABLE, TestWorkflowService.CALLED_SIGN_PROCESS_ID)
         .execute();
@@ -566,8 +566,8 @@ public class Camunda7CockpitTest {
   }
 
   /**
-   * The round of the caller as the cockpit reports it while the task is created, which is the
-   * way in through the event.
+   * The round of the caller as the cockpit reports it when the task is created. This is the way
+   * in through the event.
    */
   @Test
   @DisplayName("The round of a caller reaches the cockpit although the call activity names the called process in an expression")
@@ -587,9 +587,9 @@ public class Camunda7CockpitTest {
   }
 
   /**
-   * The same round read off the engine instead, which is the other way in. The two ways hand the
-   * walk different things, an execution and an id, so one of them answering is no reason to
-   * believe the other does.
+   * The same round, read from the engine instead. This is the other way in. The two ways give the
+   * walk different things, an execution and an id. So if one of them answers, that does not mean
+   * the other one does.
    */
   @Test
   @DisplayName("The same round is answered when the task is read instead of reported")
@@ -619,7 +619,7 @@ public class Camunda7CockpitTest {
 
   }
 
-  /** The user tasks of the called process, one per round of the caller. */
+  /** The user tasks of the called process, one for each round of the caller. */
   private List<Task> awaitTheSigningTasks(
       final TestAggregate aggregate) {
 
@@ -643,9 +643,9 @@ public class Camunda7CockpitTest {
   }
 
   /**
-   * One of those tasks as the cockpit addresses it. The workflow is the called instance rather
-   * than the business case, because that is what a reference built by the extension carries for
-   * a task of a called process.
+   * One of those tasks as the cockpit addresses it. The workflow is the called instance and not
+   * the business case, because a reference built by the extension carries that for a task of a
+   * called process.
    */
   private UserTaskReference signingReferenceOf(
       final TestAggregate aggregate,
@@ -706,9 +706,9 @@ public class Camunda7CockpitTest {
     final var signing = userTaskIdOf(aggregate);
     engine.getTaskService().complete(signing);
 
-    // the signing task is gone with that call, and so are the variables it could see: an engine
-    // holds none for a task it has finished with. The details provider bound them from the task
-    // the listener was given, which is the whole point of building the report there
+    // that call ends the signing task, and the variables it could see are gone too: an engine
+    // keeps none for a task it has finished with. The details provider bound them from the task
+    // which the listener was given. That is the reason to build the report there
     final var completed = CockpitServer
         .awaitAnyRequest("/usertask/%s/completed".formatted(signing));
     assertTrue(completed.body().contains("\"signerVariable\":\"rosa\""), completed.body());
@@ -717,7 +717,7 @@ public class Camunda7CockpitTest {
   }
 
   /**
-   * The reports of the multi-instance task, told apart from whatever else a workflow of another
+   * The reports of the multi-instance task. They are told apart from what a workflow of another
    * test may report while this one waits.
    */
   private List<String> awaitSignedTasks() {
@@ -744,9 +744,9 @@ public class Camunda7CockpitTest {
   }
 
   /**
-   * A case whose workflow the engine started, rather than VanillaBP. These BPMN processes are
-   * secondary processes of the aggregate, and what is under test is what their user task is
-   * called, not how a workflow is started.
+   * Starts a case whose workflow the engine started, not VanillaBP. These BPMN processes are
+   * secondary processes of the aggregate. The test is about the name of their user task, not
+   * about how a workflow is started.
    *
    * @param bpmnProcessId The process to start
    * @param customer What the case is called
@@ -782,7 +782,7 @@ public class Camunda7CockpitTest {
    *
    * @param bpmnProcessId The BPMN process the case runs on
    * @param aggregate The case
-   * @return The task definition the cockpit would address that task by
+   * @return The task definition by which the cockpit addresses that task
    */
   private String taskDefinitionReadBackFor(
       final String bpmnProcessId,
@@ -832,8 +832,8 @@ public class Camunda7CockpitTest {
         TestWorkflowService.EXPRESSION_FORM_KEY_PROCESS_ID, "Zeno",
         Map.of(TestWorkflowService.FORM_NAME_VARIABLE, "the-standard-form"));
 
-    // the engine really computes two different strings out of that one form key, so a reading
-    // which asks the task rather than the model would report two tasks here
+    // the engine really computes two different strings from that one form key. So a reading
+    // which asks the task and not the model would report two tasks here
     assertEquals(
         Set.of("the-express-form", "the-standard-form"),
         engine
@@ -878,14 +878,14 @@ public class Camunda7CockpitTest {
     final var reference = referenceOf(aggregate, userTaskId);
     engine.getTaskService().complete(userTaskId);
 
-    // the report of the completion was built while the task was still there, so nothing is
-    // left to read afterwards - and the cockpit asks for nothing afterwards either
+    // the report of the completion was built while the task was still there. So nothing is left
+    // to read afterwards, and the cockpit does not ask for anything afterwards either
     assertTrue(
         bridge().prefilledUserTaskDetails(reference).isEmpty(),
         "a task the engine has finished with was answered from somewhere");
 
-    // and the end was reported all the same, with the BPMN name of the task and with what the
-    // details provider made of it
+    // and the end was reported anyway, with the BPMN name of the task and with what the details
+    // provider added
     final var completed = CockpitServer
         .awaitAnyRequest("/usertask/%s/completed".formatted(userTaskId));
     assertTrue(completed.body().contains("Approve the order"), completed.body());
@@ -901,17 +901,17 @@ public class Camunda7CockpitTest {
     final var userTaskId = userTaskIdOf(aggregate);
     CockpitServer.awaitRequestOf("/usertask/created", reportsOf(aggregate));
 
-    // the first attempt is refused, so this report leaves the application after the engine
-    // changed the task and finished with it. Whenever the outbox gets to it, it says what the
-    // engine said when the assignment happened
+    // the first attempt is refused. So this report leaves the application only after the engine
+    // changed the task and finished with it. Whenever the outbox sends it, it says what the
+    // engine said at the moment of the assignment
     CockpitServer.refuseRequestsAbout(THE_ASSIGNEE_OF_THIS_TEST, 1);
     engine.getTaskService().setAssignee(userTaskId, THE_ASSIGNEE_OF_THIS_TEST);
 
     engine.getTaskService().complete(userTaskId);
 
-    // that this report arrives at all is the assertion. By the time the outbox tries it again,
-    // the engine holds no such task any more. A report built at the dispatch would find nothing
-    // to say about a running task and would be dropped for good
+    // the assertion is that this report arrives at all. When the outbox tries it again, the
+    // engine no longer has the task. A report built at the dispatch would find no running task
+    // to talk about, and it would be dropped for good
     final var updated = CockpitServer
         .awaitRequest("/usertask/%s/updated".formatted(userTaskId), THE_ASSIGNEE_OF_THIS_TEST);
     assertTrue(
@@ -1046,8 +1046,8 @@ public class Camunda7CockpitTest {
         .getActivityBehavior();
     final var taskDefinition = behavior.getTaskDefinition();
 
-    // built-in rather than custom: an operator asking the engine to skip the custom listeners
-    // of the model still produces the events the cockpit needs
+    // built-in and not custom: when an operator asks the engine to skip the custom listeners of
+    // the model, the cockpit still gets the events it needs
     Stream
         .of(
             TaskListener.EVENTNAME_CREATE, TaskListener.EVENTNAME_UPDATE,
@@ -1065,8 +1065,8 @@ public class Camunda7CockpitTest {
                   .formatted(eventName, listeners));
         });
 
-    // and VanillaBP wired the task before the cockpit did, which is what a details provider
-    // reading an aggregate a completed task just changed depends on
+    // and VanillaBP wired the task before the cockpit did. A details provider which reads an
+    // aggregate that a completed task has just changed depends on this order
     final var created = taskDefinition
         .getBuiltinTaskListeners()
         .getOrDefault(TaskListener.EVENTNAME_CREATE, List.of());
@@ -1086,9 +1086,9 @@ public class Camunda7CockpitTest {
     CockpitServer.awaitRequestOf("/usertask/created", reportsOf(aggregate));
 
     final var workflowId = workflowIdOf(aggregate);
-    // what the Camunda web application does when an operator deletes a case: the listeners of
-    // the model are skipped because they belong to the process, and the cockpit is not part of
-    // the process - so its own listeners are built-in and run anyway
+    // this is what the Camunda web application does when an operator deletes a case. It skips
+    // the listeners of the model, because they belong to the process. The cockpit is not part of
+    // the process, so its own listeners are built-in and run anyway
     engine
         .getRuntimeService()
         .deleteProcessInstance(workflowId, "an operator deleted it", true);

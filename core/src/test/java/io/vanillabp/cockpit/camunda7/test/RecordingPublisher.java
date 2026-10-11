@@ -12,8 +12,8 @@ import io.vanillabp.cockpit.extension.spi.WorkflowEventKind;
 import io.vanillabp.cockpit.extension.spi.WorkflowReference;
 
 /**
- * The platform-neutral half of the extension, played by the test: it writes down what it was told
- * instead of writing an outbox entry, so that a test can tell "reported nothing" from "was never
+ * Plays the platform-neutral half of the extension for the test. It writes down what it was told
+ * instead of writing an outbox entry. So a test can tell "reported nothing" apart from "was never
  * asked".
  */
 public class RecordingPublisher implements BusinessCockpitEventPublisher {

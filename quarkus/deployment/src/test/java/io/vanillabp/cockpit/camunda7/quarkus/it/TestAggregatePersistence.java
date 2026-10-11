@@ -8,8 +8,8 @@ import io.vanillabp.integration.spi.AggregatePersistenceAware;
 import jakarta.enterprise.context.ApplicationScoped;
 
 /**
- * Where the test application keeps its workflow aggregates. It is in memory rather than in a
- * database, because what is under test is the extension and not a persistence.
+ * Keeps the workflow aggregates of the test application. It keeps them in memory and not in a
+ * database, because the test is about the extension and not about persistence.
  */
 @ApplicationScoped
 public class TestAggregatePersistence implements AggregatePersistenceAware<TestAggregate> {

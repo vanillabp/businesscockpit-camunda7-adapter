@@ -35,12 +35,12 @@ import jakarta.inject.Inject;
 import jakarta.transaction.UserTransaction;
 
 /**
- * The Camunda 7 half of the Business Cockpit inside a booted Quarkus application: the extension
- * is enabled, its listeners sit on the deployed user tasks, what a workflow does reaches the
- * cockpit server, and the engine answers what the cockpit reads back.
+ * Tests the Camunda 7 half of the Business Cockpit inside a booted Quarkus application. The
+ * extension is enabled, its listeners sit on the deployed user tasks, what a workflow does reaches
+ * the cockpit server, and the engine answers what the cockpit reads back.
  * <p>
- * It runs the same way through as the Spring Boot test of this repository, and it exists because
- * a platform-neutral half being right says nothing about a platform's glue ever calling it.
+ * It runs the same steps as the Spring Boot test of this repository. It is needed because a
+ * correct platform-neutral half does not prove that the glue code of a platform ever calls it.
  */
 @ExtendWith(SuppressOutputExtension.class)
 @SuppressOutputExtension.SuppressBackgroundOutput
@@ -148,7 +148,7 @@ public class Camunda7CockpitTest {
   }
 
   /**
-   * When a report says its user task was created. Only the report of an end carries it.
+   * When the report says its user task was created. Only the report of an end carries this.
    *
    * @param report The report as the cockpit server received it
    * @return The time the report names, as an instant
@@ -221,9 +221,9 @@ public class Camunda7CockpitTest {
     final var started = aStartedWorkflow("Anna");
     userTaskIdOf(started);
 
-    // both reports are awaited by the id of this case: '/workflow/created' and
-    // '/usertask/created' are paths every case reports on, so waiting on the path alone
-    // takes whichever report arrived first and asserts against a case nobody asked about
+    // both reports are awaited by the id of this case. Every case reports on '/workflow/created'
+    // and '/usertask/created'. Waiting on the path alone takes whichever report arrived first,
+    // and then asserts against a case nobody asked about
     final var thisCase = "\"businessId\":\"%s\"".formatted(started.getId());
 
     final var workflow = CockpitServer.awaitRequest("/workflow/created", thisCase);
@@ -256,7 +256,7 @@ public class Camunda7CockpitTest {
     final var created = creationOf(userTaskId);
     engine().getTaskService().complete(userTaskId);
 
-    // the report of an end says when its task was created, for the cockpit which gets the end
+    // the report of an end says when its task was created, for a cockpit which gets the end
     // before the creation
     final var task = CockpitServer.awaitAnyRequest("/usertask/%s/completed".formatted(userTaskId));
     assertEquals(created, startNamedBy(task), task.body());
@@ -302,14 +302,14 @@ public class Camunda7CockpitTest {
   }
 
   /**
-   * The two rounds the caller of the expression-named call activity runs, one string apiece, so
-   * that both ways into the bridge are compared as values.
+   * The two rounds which the caller of the expression-named call activity runs, one string each.
+   * So both ways into the bridge are compared as values.
    */
   private static final Set<String> THE_TWO_ROUNDS_OF_THE_CALLER = Set.of("anna#0/2", "bert#1/2");
 
   /**
-   * A case whose caller iterates over its signers and calls the signing process once per round,
-   * naming that process in an expression.
+   * Starts a case whose caller loops over its signers and calls the signing process once per
+   * round. The call activity names that process in an expression.
    *
    * @param customer What the case is called
    * @return The saved case, whose id is the business key of every instance started here
@@ -329,7 +329,7 @@ public class Camunda7CockpitTest {
         .createProcessInstanceByKey(TestWorkflowService.EXPRESSION_CALL_PROCESS_ID)
         .processDefinitionTenantId(MODULE_ID)
         .businessKey(String.valueOf(aggregate.getId()))
-        // what the deployment could not read: the process to call is chosen per instance
+        // the deployment could not read this: each instance chooses the process to call
         .setVariable(
             TestWorkflowService.CALLED_PROCESS_VARIABLE, TestWorkflowService.CALLED_SIGN_PROCESS_ID)
         .execute();
@@ -338,8 +338,8 @@ public class Camunda7CockpitTest {
   }
 
   /**
-   * The round of the caller as the cockpit reports it while the task is created, which is the
-   * way in through the event.
+   * The round of the caller as the cockpit reports it when the task is created. This is the way
+   * in through the event.
    */
   @Test
   @DisplayName("The round of a caller reaches the cockpit although the call activity names the called process in an expression")
@@ -360,9 +360,9 @@ public class Camunda7CockpitTest {
   }
 
   /**
-   * The same round read off the engine instead, which is the other way in. The two ways hand the
-   * walk different things, an execution and an id, so one of them answering is no reason to
-   * believe the other does.
+   * The same round, read from the engine instead. This is the other way in. The two ways give the
+   * walk different things, an execution and an id. So if one of them answers, that does not mean
+   * the other one does.
    */
   @Test
   @DisplayName("The same round is answered when the task is read instead of reported")
@@ -392,7 +392,7 @@ public class Camunda7CockpitTest {
 
   }
 
-  /** The user tasks of the called process, one per round of the caller. */
+  /** The user tasks of the called process, one for each round of the caller. */
   private List<Task> awaitTheSigningTasks(
       final TestAggregate aggregate) {
 
@@ -416,9 +416,9 @@ public class Camunda7CockpitTest {
   }
 
   /**
-   * One of those tasks as the cockpit addresses it. The workflow is the called instance rather
-   * than the business case, because that is what a reference built by the extension carries for
-   * a task of a called process.
+   * One of those tasks as the cockpit addresses it. The workflow is the called instance and not
+   * the business case, because a reference built by the extension carries that for a task of a
+   * called process.
    */
   private UserTaskReference signingReferenceOf(
       final TestAggregate aggregate,
@@ -469,14 +469,14 @@ public class Camunda7CockpitTest {
     aggregates.save(aggregate);
     transaction.commit();
 
-    // started through the engine rather than through VanillaBP: the multi-instance process is a
-    // secondary process of this aggregate, and what is under test is what the listener reports
+    // started through the engine and not through VanillaBP: the multi-instance process is a
+    // secondary process of this aggregate, and the test is about what the listener reports
     engine()
         .getRuntimeService()
         .createProcessInstanceByKey(TestWorkflowService.MULTI_INSTANCE_PROCESS_ID)
         .processDefinitionTenantId(MODULE_ID)
         .businessKey(String.valueOf(aggregate.getId()))
-        // a variable of the process instance, which the multi-instance executions run below
+        // a variable of the process instance, which is the parent of the multi-instance executions
         .setVariable(TestWorkflowService.ORDER_KIND_VARIABLE, "express")
         .execute();
 
@@ -487,8 +487,8 @@ public class Camunda7CockpitTest {
         bodies.stream().anyMatch(body -> body.contains("\"signer\":\"cleo\"")), bodies.toString());
     bodies.forEach(body -> assertTrue(body.contains("\"total\":\"3\""), body));
 
-    // '@TaskParam' is bound from every variable the task can see: the one its own execution
-    // holds and the one of the process instance enclosing it
+    // '@TaskParam' is bound from every variable the task can see: the one of its own execution,
+    // and the one of the enclosing process instance
     assertTrue(
         bodies.stream().anyMatch(body -> body.contains("\"signerVariable\":\"anna\"")),
         bodies.toString());
@@ -497,7 +497,7 @@ public class Camunda7CockpitTest {
   }
 
   /**
-   * The reports of the multi-instance task, told apart from whatever else a workflow of another
+   * The reports of the multi-instance task. They are told apart from what a workflow of another
    * test may report while this one waits.
    */
   private List<String> awaitSignedTasks() {
@@ -555,8 +555,8 @@ public class Camunda7CockpitTest {
                 MODULE_ID, TestWorkflowService.BPMN_PROCESS_ID, aggregateId, userTaskId)
             .isPresent());
 
-    // and a task the engine has finished with is answered no more. Its end was reported while
-    // the task was still there, so there is nothing left for the cockpit to ask about
+    // and a task the engine has finished with is no longer answered. Its end was reported while
+    // the task was still there, so the cockpit has nothing left to ask about
     engine().getTaskService().complete(userTaskId);
     assertTrue(
         bridge()

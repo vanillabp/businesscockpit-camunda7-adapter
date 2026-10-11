@@ -25,13 +25,13 @@ import jakarta.inject.Inject;
 import jakarta.transaction.UserTransaction;
 
 /**
- * Which details provider serves a case and its user task is decided by the version Camunda
- * counted for the deployed process, inside a booted Quarkus application.
+ * Tests that the version Camunda counted for the deployed process decides which details provider
+ * serves a case and its user task, inside a booted Quarkus application.
  * <p>
- * It runs the same way through as the Spring Boot test of this repository. The workflow service
- * has two providers for its user task and two for its workflow, one of each pair for version 1
- * and the other for every version after it, and the test deploys a second generation of the
- * model to reach the second of each pair.
+ * It runs the same steps as the Spring Boot test of this repository. The workflow service has two
+ * providers for its user task and two for its workflow. One of each pair serves version 1, and
+ * the other serves every later version. The test deploys a second generation of the model to
+ * reach the second provider of each pair.
  */
 @ExtendWith(SuppressOutputExtension.class)
 @SuppressOutputExtension.SuppressBackgroundOutput
@@ -41,7 +41,7 @@ public class Camunda7ProcessVersionTest {
 
   private static final String MODULE_ID = "c7-cockpit";
 
-  /** Where the model this application deploys is read from, to deploy a second one like it. */
+  /** The model this application deploys. The test reads it to deploy a second one like it. */
   private static final String MODEL = "c7-cockpit/processes/cockpit-process.bpmn";
 
   @RegisterExtension
@@ -79,10 +79,10 @@ public class Camunda7ProcessVersionTest {
   }
 
   /**
-   * Another application on the same cockpit server may have reported a case carrying the same
-   * business id as one of these: every test application of this module counts its aggregates from
-   * 1 in a database of its own. So what arrived before this test is forgotten, and what is
-   * asserted afterwards is this test's own.
+   * Another application on the same cockpit server may have reported a case with the same
+   * business id as one of these, because every test application of this module counts its
+   * aggregates from 1 in a database of its own. So the test forgets what arrived before it, and
+   * asserts only on what arrives afterwards.
    */
   @BeforeEach
   public void forgetWhatArrivedBefore() {
@@ -92,8 +92,8 @@ public class Camunda7ProcessVersionTest {
   }
 
   /**
-   * A case whose workflow is running. VanillaBP starts a workflow in two phases, so the aggregate
-   * is saved before the engine has anything, and a test reading the engine has to wait for it.
+   * Starts a case and its workflow. VanillaBP starts a workflow in two phases. So the aggregate is
+   * saved before the engine has anything, and a test which reads the engine has to wait for it.
    *
    * @param customer What the case is called
    * @return The saved case, whose id is the business key of its workflow
@@ -150,9 +150,9 @@ public class Camunda7ProcessVersionTest {
   }
 
   /**
-   * A second generation of the same model, deployed the way a release deploys one: same BPMN
-   * process id, same tenant, one changed name. Camunda counts it as the next version of every
-   * process in the file, and a case started afterwards runs on it.
+   * Deploys a second generation of the same model, as a release does: same BPMN process id, same
+   * tenant, one changed name. Camunda counts it as the next version of every process in the file,
+   * and a case started afterwards runs on it.
    */
   private void deployASecondGeneration() {
 
@@ -177,7 +177,7 @@ public class Camunda7ProcessVersionTest {
 
   }
 
-  /** The version Camunda holds the newest deployment of the test's process under. */
+  /** The version under which Camunda holds the newest deployment of the test's process. */
   private String latestVersionOfTheModel() {
 
     return String
@@ -193,9 +193,8 @@ public class Camunda7ProcessVersionTest {
   }
 
   /**
-   * What the cockpit server was told about one case. The server is shared with the other
-   * applications of this module, so the business id every report carries is what tells them
-   * apart.
+   * What the cockpit server was told about one case. The other applications of this module share
+   * the server, so the business id in every report tells the cases apart.
    *
    * @param pathSuffix What the report's path has to end with
    * @param aggregate The case the report is about

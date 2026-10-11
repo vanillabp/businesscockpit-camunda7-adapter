@@ -28,29 +28,28 @@ import io.vanillabp.cockpit.extension.test.support.CockpitServer;
 import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 
 /**
- * Which details provider serves a case and its user task is decided by the version Camunda
- * counted for the deployed process.
+ * Tests that the version Camunda counted for the deployed process decides which details provider
+ * serves a case and its user task.
  * <p>
  * The workflow service of this application has two providers for its user task and two for its
- * workflow. One of each pair serves version 1 and the other serves every version after it, so
- * nothing but the version can tell them apart. What the cockpit server receives says which one
- * ran.
+ * workflow. One of each pair serves version 1, and the other serves every later version. So only
+ * the version tells them apart. What the cockpit server receives shows which one ran.
  * <p>
- * The test deploys a second generation of the model itself, the way a release does, and starts
- * a case on it. That is the half a single deployment cannot show: a version the application
- * reports has to follow the deployment rather than being the same number forever.
+ * The test deploys a second generation of the model itself, as a release does, and starts a case
+ * on it. A single deployment cannot show this half: the version the application reports has to
+ * follow the deployment and must not stay the same number forever.
  */
 @SpringBootTest(classes = TestApplication.class)
 @ExtendWith(SuppressOutputExtension.class)
 @SuppressOutputExtension.SuppressBackgroundOutput
-// closed when the class is done: an engine outliving its test keeps its job executor running
-// against a database the next class works on
+// closed when the class is done: an engine which outlives its test keeps its job executor
+// running against a database the next class works on
 @DirtiesContext
 public class Camunda7ProcessVersionTest {
 
   private static final String MODULE_ID = "c7-cockpit";
 
-  /** Where the model this application deploys is read from, to deploy a second one like it. */
+  /** The model this application deploys. The test reads it to deploy a second one like it. */
   private static final String MODEL = "c7-cockpit/processes/cockpit-process.bpmn";
 
   @DynamicPropertySource
@@ -84,10 +83,10 @@ public class Camunda7ProcessVersionTest {
   }
 
   /**
-   * Another application on the same cockpit server may have reported a case carrying the same
-   * business id as one of these: every test class here counts its aggregates from 1 in a database
-   * of its own. So what arrived before this test is forgotten, and what is asserted afterwards is
-   * this test's own.
+   * Another application on the same cockpit server may have reported a case with the same
+   * business id as one of these, because every test class here counts its aggregates from 1 in a
+   * database of its own. So the test forgets what arrived before it, and asserts only on what
+   * arrives afterwards.
    */
   @BeforeEach
   public void forgetWhatArrivedBefore() {
@@ -97,8 +96,8 @@ public class Camunda7ProcessVersionTest {
   }
 
   /**
-   * A case whose workflow is running. VanillaBP starts a workflow in two phases, so the aggregate
-   * is saved before the engine has anything, and a test reading the engine has to wait for it.
+   * Starts a case and its workflow. VanillaBP starts a workflow in two phases. So the aggregate is
+   * saved before the engine has anything, and a test which reads the engine has to wait for it.
    *
    * @param customer What the case is called
    * @return The saved case, whose id is the business key of its workflow
@@ -144,9 +143,9 @@ public class Camunda7ProcessVersionTest {
   }
 
   /**
-   * A second generation of the same model, deployed the way a release deploys one: same BPMN
-   * process id, same tenant, one changed name. Camunda counts it as the next version of every
-   * process in the file, and a case started afterwards runs on it.
+   * Deploys a second generation of the same model, as a release does: same BPMN process id, same
+   * tenant, one changed name. Camunda counts it as the next version of every process in the file,
+   * and a case started afterwards runs on it.
    */
   private void deployASecondGeneration() {
 
@@ -170,8 +169,8 @@ public class Camunda7ProcessVersionTest {
   }
 
   /**
-   * What the cockpit server was told about one case, told apart from what it was told about the
-   * others by the business id every report carries.
+   * What the cockpit server was told about one case. The business id in every report tells it
+   * apart from the reports about other cases.
    *
    * @param pathSuffix What the report's path has to end with
    * @param aggregate The case the report is about
@@ -187,7 +186,7 @@ public class Camunda7ProcessVersionTest {
 
   }
 
-  /** The version Camunda holds the newest deployment of the test's process under. */
+  /** The version under which Camunda holds the newest deployment of the test's process. */
   private String latestVersionOfTheModel() {
 
     return String

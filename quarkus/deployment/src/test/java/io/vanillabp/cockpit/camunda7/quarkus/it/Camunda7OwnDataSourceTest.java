@@ -21,28 +21,28 @@ import jakarta.inject.Inject;
 import jakarta.transaction.UserTransaction;
 
 /**
- * A Quarkus application whose engine writes into a database of its own, and what a workflow it
- * rolled back leaves behind.
+ * Tests a Quarkus application whose engine writes into a database of its own, and what a
+ * workflow which the engine rolled back leaves behind.
  * <p>
-  * The engine writes to a resource the application's own persistence does not take part in. Two
-  * data sources in one JTA transaction are still two commits, so the outbox entry reporting what
-  * the engine did cannot ride the engine's commit, however the container enlists them. The entry
-  * therefore gets a transaction of its own. That is the honest answer rather than a correct one:
-  * entry and engine work commit separately, and the entry of a workflow the engine rolled back is
-  * written and stays. What keeps such a workflow out of the cockpit is the dispatch. It asks the
-  * engine about the workflow, the engine holds none, and an event about a workflow nobody knows
-  * is dropped rather than sent.
+ * The engine writes to a resource which the application's own persistence does not take part in.
+ * Two data sources in one JTA transaction are still two commits. So the outbox entry which reports
+ * what the engine did cannot join the engine's commit, however the container enlists them. That
+ * is why the entry gets a transaction of its own. This answer is honest, but not exact: the entry
+ * and the engine's work commit separately, and the entry of a workflow the engine rolled back is
+ * written and stays. The dispatch keeps such a workflow out of the cockpit. It asks the engine
+ * about the workflow, the engine has none, and an event about a workflow nobody knows is dropped
+ * and not sent.
  * <p>
- * Whether an engine shares the caller's transaction is the Camunda 7 adapter's answer, read off
- * the engine that adapter built. This test pins what it answers for an engine with a data source
- * of its own, because that answer is what decides where the entry goes.
+ * The Camunda 7 adapter answers whether an engine shares the caller's transaction, and reads it
+ * from the engine it built. This test pins the answer for an engine with a data source of its own,
+ * because that answer decides where the entry goes.
  * <p>
-  * Neither data source of this application is configured as XA, and that is part of what this
-  * test says. XA was the price of the old answer, which had the entry riding the engine's JTA
-  * transaction. A second data source is enlisted there only as an XA resource, so without XA the
-  * entry failed while the engine worked. The entry has a transaction of its own now. It enlists
-  * nothing of the engine's and needs nothing declared. An application may still declare its data
-  * sources as XA for reasons of its own, and that changes nothing here.
+ * Neither data source of this application is configured as XA, and that is part of what this test
+ * shows. XA was the price of the old answer, where the entry joined the engine's JTA transaction.
+ * There, a second data source is only enlisted as an XA resource, so without XA the entry failed
+ * while the engine worked. Now the entry has a transaction of its own. It enlists nothing of the
+ * engine and needs nothing declared. An application may still declare its data sources as XA for
+ * reasons of its own, and that changes nothing here.
  */
 @ExtendWith(SuppressOutputExtension.class)
 @SuppressOutputExtension.SuppressBackgroundOutput
@@ -69,9 +69,9 @@ public class Camunda7OwnDataSourceTest {
   Camunda7CockpitCustomizer customizer;
 
   /**
-   * Nothing about the rolled-back workflow reaches the cockpit server. The entry reporting it
-   * was written all the same, in a transaction of its own, which is what the second assertion
-   * names and why the first one is about the server rather than about the store.
+   * Nothing about the rolled-back workflow reaches the cockpit server. The entry which reports it
+   * was written anyway, in a transaction of its own. The second assertion names that, and it is
+   * why the first one checks the server and not the store.
    */
   @Test
   @DisplayName("A workflow rolled back on an engine with a data source of its own is not reported")
@@ -129,8 +129,8 @@ public class Camunda7OwnDataSourceTest {
   }
 
   /**
-   * The report about one case, told apart from whatever the other Quarkus application of this
-   * module reported to the same server before it was shut down.
+   * The report about one case. It is told apart from what the other Quarkus applications of this
+   * module reported to the same server before they were shut down.
    */
   private static String awaitReportOf(
       final String pathSuffix,

@@ -15,15 +15,14 @@ import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 import jakarta.inject.Inject;
 
 /**
- * An adapter id which is configured without a section of its own, named in
+ * Tests an adapter id which has no configuration section of its own. It is named in
  * <code>prioritized-adapters</code> and nowhere else.
  * <p>
-  * That is an everyday shape, because the order of the engines is the only thing a migration has
-  * to say about the second one. It is also the shape this half used to miss. Filtering the
-  * configured adapter TYPES finds nothing for such an id, so the adapter built its engine and the
-  * cockpit built no bridge, and every event of that engine was reported to nobody. Which ids
-  * belong to an adapter type is therefore VanillaBP's answer ({@code
-  * MigrationAdapterProperties#adapterIdsOfType}) rather than this repository's.
+ * This is common: in a migration, the order of the engines is often all there is to say about
+ * the second one. This repository used to miss such an id. Filtering the configured adapter TYPES
+ * finds nothing for it. So the adapter built its engine, the cockpit built no bridge, and no event
+ * of that engine reached the cockpit. That is why VanillaBP answers which ids belong to an
+ * adapter type ({@code MigrationAdapterProperties#adapterIdsOfType}), and not this repository.
  */
 @ExtendWith(SuppressOutputExtension.class)
 @SuppressOutputExtension.SuppressBackgroundOutput

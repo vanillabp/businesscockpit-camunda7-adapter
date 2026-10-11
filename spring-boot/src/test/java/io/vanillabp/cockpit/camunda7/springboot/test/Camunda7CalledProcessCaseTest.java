@@ -27,22 +27,24 @@ import io.vanillabp.cockpit.extension.test.support.CockpitServer;
 import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 
 /**
- * A called process is a case of its own exactly where it has a workflow aggregate of its own.
+ * Tests that a called process is a case of its own exactly when it has a workflow aggregate of
+ * its own.
  * <p>
- * One calling case starts two processes at once by call activities. The step works on the
+ * One calling case starts two processes at once through call activities. The step works on the
  * caller's aggregate and belongs to the caller's case. The other process works on an aggregate of
- * its own, and the engine starts it as a case of its own. See decision 15 in the repository's
- * DECISIONS.md.
+ * its own, and the engine starts it as a case of its own. See decision 15 in the DECISIONS.md of
+ * this repository.
  * <p>
- * Each case is also changed and read through the application's <code>BusinessCockpitService</code>.
- * Those three calls first ask VanillaBP what it wrote down at the start of the case, under the
- * primary process of the aggregate. So they show that the note is found for both kinds of case.
+ * Each case is also changed and read through the <code>BusinessCockpitService</code> of the
+ * application. Its three methods used here first ask VanillaBP what it noted at the start of the
+ * case, under the primary process of the aggregate. So they show that the note is found for both
+ * kinds of case.
  */
 @SpringBootTest(classes = TestApplication.class)
 @ExtendWith(SuppressOutputExtension.class)
 @SuppressOutputExtension.SuppressBackgroundOutput
-// closed when the class is done: an engine outliving its test keeps its job executor running
-// against a database the next class works on
+// closed when the class is done: an engine which outlives its test keeps its job executor
+// running against a database the next class works on
 @DirtiesContext
 public class Camunda7CalledProcessCaseTest {
 
@@ -181,7 +183,7 @@ public class Camunda7CalledProcessCaseTest {
     assertEquals(callerId, idOf(step, "workflowId"), step.body());
     assertNotEquals(callerId, idOf(step, "subWorkflowId"), step.body());
 
-    // the case of its own, reported at its start like a case nobody called
+    // the case of its own, reported at its start like a case which nobody called
     final var ownCase = CockpitServer.awaitRequest("/workflow/created", ownMarker);
     final var ownId = idOf(ownCase, "workflowId");
     final var ownAggregate = transactions.execute(status -> theOwnCaseOf(caller));
@@ -192,7 +194,7 @@ public class Camunda7CalledProcessCaseTest {
     assertEquals(ownId, idOf(ownTask, "workflowId"), ownTask.body());
     assertFalse(namesASubWorkflow(ownTask), ownTask.body());
 
-    // the step did not become a case: one case per call, and one for the caller
+    // the step did not become a case: the caller's marker names only the caller's case
     CockpitServer.awaitQuiet();
     assertEquals(
         List.of(callerId),
@@ -214,7 +216,7 @@ public class Camunda7CalledProcessCaseTest {
             .map(WorkflowReference::workflowId)
             .toList());
 
-    // the three calls which read VanillaBP's note of the start first, once per kind of case
+    // the three methods which first read VanillaBP's note from the start, for both kinds of case
     final var stepId = idOf(step, "userTaskId");
     final var ownTaskId = idOf(ownTask, "userTaskId");
     CockpitServer.forgetRequests();
@@ -245,7 +247,7 @@ public class Camunda7CalledProcessCaseTest {
                     ownCaseService
                         .businessCockpit()
                         .getUserTask(ownCaseAggregates.findById(ownAggregate.getId()).orElseThrow(), ownTaskId),
-                    // a task of the case of its own is no task of the caller's case
+                    // a task of the case of its own is not a task of the caller's case
                     callingService
                         .businessCockpit()
                         .getUserTask(callingAggregates.findById(caller.getId()).orElseThrow(), ownTaskId)));

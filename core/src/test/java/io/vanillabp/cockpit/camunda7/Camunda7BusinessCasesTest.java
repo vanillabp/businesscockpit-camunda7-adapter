@@ -26,8 +26,8 @@ import io.vanillabp.integration.adapter.spi.workflowtask.WorkflowTaskWiring;
 import io.vanillabp.integration.test.utils.SuppressOutputExtension;
 
 /**
- * Which instance of a call hierarchy is the business case. Whether two processes share the
- * workflow aggregate is the core's answer, which this test gives with a mock.
+ * Tests which instance of a call hierarchy is the business case. Whether two processes share the
+ * workflow aggregate is for the core to answer, so this test answers it with a mock.
  */
 @ExtendWith(SuppressOutputExtension.class)
 public class Camunda7BusinessCasesTest {
