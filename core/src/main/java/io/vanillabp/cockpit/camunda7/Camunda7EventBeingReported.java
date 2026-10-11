@@ -10,11 +10,11 @@ import org.camunda.bpm.engine.impl.history.event.HistoricProcessInstanceEventEnt
  * <p>
  * The Business Cockpit builds a report at the moment of the event. It asks
  * {@link Camunda7CockpitBridge} what the engine says about the task or the workflow, and it asks
- * by identifiers only. Inside the engine command which fires the event those identifiers cannot
- * be looked up: the task listener runs before the command is flushed, so the history of this very
- * event is not written yet, and a task the command is about to delete is still there but says
- * nothing about what was just done to it. What the engine DID hand over says all of it, and that
- * is the task of the listener and the history event of the process instance.
+ * by identifiers only. Inside the engine command which fires the event, nobody can look those
+ * identifiers up. The task listener runs before the command is flushed, so the history of this
+ * very event is not written yet. A task the command is about to delete is still there, but it
+ * says nothing about what was just done to it. What the engine DID hand over says all of it: the
+ * task of the listener and the history event of the process instance.
  * <p>
  * So the two halves of this extension pass it from one to the other on the thread they share.
  * {@link Camunda7CockpitEvents} puts the event here for as long as the report of it is being
@@ -22,11 +22,10 @@ import org.camunda.bpm.engine.impl.history.event.HistoricProcessInstanceEventEnt
  * cockpit's neutral half builds the report, calls the details provider and writes the outbox
  * entry, all inside the call which reported the event.
  * <p>
- * Asked about anything else, this answers nothing and the bridge reads the engine instead. That
- * is what a question of <code>BusinessCockpitService</code> is, and it is also what a details
- * provider asking about a second task while the first one is being reported is. The answer is
- * keyed by the identifier for exactly that reason: an event is only ever the answer about its own
- * task or its own workflow.
+ * Asked about anything else, this answers nothing and the bridge reads the engine instead. A
+ * question of <code>BusinessCockpitService</code> is such a case. So is a details provider which
+ * asks about a second task while the first one is being reported. That is why the answer is
+ * keyed by the identifier. An event only ever answers about its own task or its own workflow.
  */
 public final class Camunda7EventBeingReported {
 

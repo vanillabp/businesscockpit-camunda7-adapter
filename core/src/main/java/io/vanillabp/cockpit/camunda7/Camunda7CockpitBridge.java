@@ -42,9 +42,9 @@ import io.vanillabp.integration.extension.spi.handler.HandlerMultiInstance;
   * A report is built at the moment of the event, inside the engine command which fired it. The
   * two <code>prefilled…</code> methods then answer out of what the engine handed to the listener
   * or to the history handler, which {@link Camunda7EventBeingReported} holds while that report is
-  * built. Nothing is queried there, and for a good reason: the command has not been flushed yet,
-  * so the history of this very event is not written, and a query for it answers nothing at all.
-  * The event itself says everything a report needs.
+  * built. Nothing is queried there, because the command has not been flushed yet. So the history
+  * of this very event is not written, and a query for it answers nothing at all. The event itself
+  * says everything a report needs.
  * <p>
   * The other way in is a question of <code>BusinessCockpitService</code>, and no event is
   * anywhere near it. The application reads a task it names, or it says that its aggregate
@@ -184,7 +184,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         .stream()
         // the cockpit shows business cases. A called process which shares its caller's
         // aggregate is a step of the caller's case, and one with an aggregate of its own is a
-        // case - see decisions 3 and 15 in the repository's DECISIONS.md
+        // case. See decisions 3 and 15 in the repository's DECISIONS.md
         .filter(
             instance -> Camunda7BusinessCases
                 .isACase(
@@ -305,15 +305,15 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
    * A user task as the engine handed it to the listener.
    * <p>
     * Every field comes off the task, its execution and the process definition that execution
-    * runs on. None of it is a query, and that is what makes this readable inside the engine
-    * command: the objects are the ones the command is working with, and they carry what was just
-    * done to the task. A task which is being completed still answers its variables here, which
-    * is the one thing reading it back afterwards could never do.
+    * runs on. None of it is a query, so this can be read inside the engine command. The objects
+    * are the ones the command is working with, and they carry what was just done to the task. A
+    * task which is being completed still answers its variables here. Reading it back afterwards
+    * could never do that.
    * <p>
     * One field of a prefill stays empty here and in the read below: the initiator. Camunda 7
-    * records who started a case in the history of the process instance, so a user task never
-    * carried it without a second query, and at the moment of an event no query reaches it at
-    * all. Nothing else is put there instead - see decision 10 in the repository's DECISIONS.md.
+    * records who started a case in the history of the process instance. A user task could only
+    * get it with a second query, and at the moment of an event no query reaches it at all.
+    * Nothing else is put there instead. See decision 10 in the repository's DECISIONS.md.
    * <p>
     * The task also says when it was created. The cockpit reads that only from the report of an
     * end, for an end which arrives before the creation did.
@@ -552,7 +552,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
     * to read: with a version tag it reads <code>release-7:4</code>, and it goes into the
     * prefilled details, which is what the cockpit shows next to a task or a case. The other one
     * is the version the engine counted, <code>4</code>, and it goes into the reference. That is
-    * what picks the details provider of that version, so it must carry no tag - see
+    * what picks the details provider of that version, so it must carry no tag. See
     * {@link Camunda7Scope#processVersionOf(String)}.
    * <p>
     * The adapter resolved that definition when it first met it, and it answers every later
@@ -631,13 +631,13 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
     * its own task deliveries anyway.
    * <p>
     * Both calls of it hand over the task registry of this engine. The walk needs it for a call
-    * activity which names the process it calls in an expression: nothing was written onto such a
-    * call activity while the model was deployed, so the question whether the called process
-    * continues the caller's business case is asked while the workflow runs. Without the registry
-    * the walk ends there, so the cockpit names no round at all for a task of such a called
-    * process, and a details provider asking for one is refused while the task is created. Both
-    * ways into this class hand the registry over, because a task read off the engine has to say
-    * what reporting its creation said. Measured by
+    * activity which names the process it calls in an expression. Nothing was written onto such a
+    * call activity while the model was deployed. So the walk asks while the workflow runs whether
+    * the called process continues the caller's business case. Without the registry the walk ends
+    * there. Then the cockpit names no round at all for a task of such a called process, and a
+    * details provider asking for one is refused while the task is created. Both ways into this
+    * class hand the registry over, because a task read from the engine has to say what the report
+    * of its creation said. Measured by
     * {@code Camunda7CockpitTest#theLevelOfACallerReachesTheCockpit} and
     * {@code Camunda7CockpitTest#theLevelOfACallerIsAnsweredWhenTheTaskIsRead}.
    * <p>
