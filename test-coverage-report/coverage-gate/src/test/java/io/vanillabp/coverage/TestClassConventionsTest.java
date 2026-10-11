@@ -14,14 +14,20 @@ import io.vanillabp.integration.test.utils.TestClassConventions;
 /**
  * A gate in the module which already gates this repository as a whole. Every test class
  * registers {@link SuppressOutputExtension}, and registers it before {@code @Testcontainers}. So
- * a build log holds what a FAILING test printed and nothing else.
+ * a build log holds what a FAILING test printed and little else.
  * <p>
  * This rule breaks without anybody noticing, because a class which forgets it stays quiet as
- * long as its tests pass. So it is checked here and not left to a review.
+ * long as its tests pass. It starts to talk on the day it gets a mock which warns or a container
+ * which boots. By then nobody connects the noise to the class. So the rule is checked here and
+ * not left to a review.
+ * <p>
+ * The check reads the test sources, so this one class covers every module of the repository,
+ * also the modules added later.
  * <p>
  * The gate also checks the guiding messages of this repository. A developer reads such a message
  * at the moment something goes wrong. A sentence which fell apart in the source takes away the
- * one explanation they get. The check reads the main sources, and one run covers every module.
+ * one explanation they get. That check reads the main sources, and one run covers every module
+ * as well.
  */
 @ExtendWith(SuppressOutputExtension.class)
 public class TestClassConventionsTest {
