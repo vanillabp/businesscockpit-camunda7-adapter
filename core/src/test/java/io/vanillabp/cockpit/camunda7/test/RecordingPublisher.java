@@ -30,6 +30,8 @@ public class RecordingPublisher implements BusinessCockpitEventPublisher {
 
   private final List<OffsetDateTime> workflowTimestamps = new LinkedList<>();
 
+  private final List<List<String>> wiredUserTasks = new LinkedList<>();
+
   @Override
   public boolean publishUserTaskEvent(
       final UserTaskReference userTask,
@@ -111,6 +113,26 @@ public class RecordingPublisher implements BusinessCockpitEventPublisher {
   public List<OffsetDateTime> workflowTimestamps() {
 
     return workflowTimestamps;
+
+  }
+
+  @Override
+  public void userTaskWired(
+      final String workflowModuleId,
+      final String bpmnProcessId,
+      final String taskDefinition,
+      final String bpmnTaskId) {
+
+    wiredUserTasks.add(List.of(workflowModuleId, bpmnProcessId, taskDefinition, bpmnTaskId));
+
+  }
+
+  /**
+   * @return Every user task a wiring named, as module, process, task definition and element id
+   */
+  public List<List<String>> wiredUserTasks() {
+
+    return wiredUserTasks;
 
   }
 

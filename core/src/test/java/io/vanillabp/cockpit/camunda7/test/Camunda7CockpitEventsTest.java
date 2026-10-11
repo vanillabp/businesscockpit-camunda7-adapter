@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -19,6 +20,7 @@ import org.camunda.bpm.engine.impl.history.event.HistoricTaskInstanceEventEntity
 import org.camunda.bpm.engine.impl.history.event.HistoryEventTypes;
 import org.camunda.bpm.engine.impl.persistence.entity.ExecutionEntity;
 import org.camunda.bpm.engine.impl.persistence.entity.ProcessDefinitionEntity;
+import org.camunda.bpm.model.bpmn.Bpmn;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -354,7 +356,7 @@ public class Camunda7CockpitEventsTest {
     final var workflowTaskWiring = mock(WorkflowTaskWiring.class);
     when(workflowTaskWiring.isClaimedByAWorkflowService(MODULE_ID, claimed)).thenReturn(true);
     when(workflowTaskWiring.isClaimedByAWorkflowService(MODULE_ID, unclaimed)).thenReturn(false);
-    final var wiring = new Camunda7CockpitWiring(processes, workflowTaskWiring);
+    final var wiring = new Camunda7CockpitWiring(processes, workflowTaskWiring, () -> publisher);
 
     wiring.wireBpmn(MODULE_ID, "unclaimed.bpmn", unclaimed, null, null);
     wiring.wireBpmn(MODULE_ID, "claimed.bpmn", claimed, null, null);
@@ -371,6 +373,104 @@ public class Camunda7CockpitEventsTest {
                 HistoryEventTypes.PROCESS_INSTANCE_START, MODULE_ID, unclaimed, "4711"));
     assertTrue(publisher.userTasks().isEmpty(), publisher.userTasks().toString());
     assertTrue(publisher.workflowTimestamps().isEmpty(), publisher.workflowTimestamps().toString());
+
+  }
+
+  @Test
+  @DisplayName("Wiring a model names its user tasks to the extension, with the values the listener reports")
+  public void wiringNamesTheUserTasksOfTheProcess() {
+
+    final var workflowTaskWiring = mock(WorkflowTaskWiring.class);
+    when(workflowTaskWiring.isClaimedByAWorkflowService(MODULE_ID, BPMN_PROCESS_ID)).thenReturn(true);
+    final var wiring = new Camunda7CockpitWiring(processes, workflowTaskWiring, () -> publisher);
+    // the adapter put the workflow module in front of the id while it prepared the model
+    final var model = Bpmn
+        .createExecutableProcess(MODULE_ID
+            + "__"
+            + BPMN_PROCESS_ID)
+        .startEvent()
+        .userTask("Activity_review")
+        .camundaFormKey("review-form")
+        .subProcess()
+        .embeddedSubProcess()
+        .startEvent()
+        .userTask("Activity_inner")
+        .endEvent()
+        .subProcessDone()
+        .endEvent()
+        .done();
+
+    wiring.wireBpmn(MODULE_ID, "a.bpmn", BPMN_PROCESS_ID, model, null);
+
+    assertEquals(
+        List.of(
+            List.of(MODULE_ID, BPMN_PROCESS_ID, "review-form", "Activity_review"),
+            List.of(MODULE_ID, BPMN_PROCESS_ID, "Activity_inner", "Activity_inner")),
+        publisher.wiredUserTasks());
+
+  }
+
+  @Test
+  @DisplayName("A user task of a called process carries the version of the called process, not the one of its caller")
+  public void aTaskOfACalledProcessCarriesTheVersionOfTheCalledProcess() {
+
+    final var called = "ACalledProcess";
+    final var calledDefinitionId = "ACalledProcess:2:9";
+    processes.register(MODULE_ID, called);
+    // the called process works on the caller's aggregate, so the task belongs to the caller's case
+    final var core = mock(WorkflowTaskWiring.class);
+    when(core.workflowsShareTheWorkflowAggregate(anyString(), anyString(), anyString())).thenReturn(true);
+    processes.rememberTheCore(core);
+    final var versions = new Camunda7ProcessVersions(
+        ADAPTER_ID, null, (
+            workflowModuleId,
+            bpmnProcessId) -> bpmnProcessId, workflowModuleId -> workflowModuleId, null);
+    versions.recordDeployed(MODULE_ID, BPMN_PROCESS_ID, DEFINITION_ID, Integer.parseInt(COUNTED_VERSION), null);
+    versions.recordDeployed(MODULE_ID, called, calledDefinitionId, 2, null);
+    final var taskRegistry = new Camunda7TaskRegistry();
+    taskRegistry.setProcessVersions(versions);
+    final var scoping = new NameClashAvoidanceService(new MigrationAdapterProperties());
+    final var engine = new Camunda7EngineFacts(ADAPTER_ID, scoping, workflowModuleId -> null, taskRegistry);
+    final var withTheCalledProcess = new Camunda7CockpitEvents(
+        new Camunda7Scope(ADAPTER_ID, scoping, () -> engine), processes, new Camunda7EventBeingReported(), () -> publisher, () -> EventTransaction.CURRENT);
+
+    final var callerDefinition = mock(ProcessDefinitionEntity.class);
+    when(callerDefinition.getTenantId()).thenReturn(MODULE_ID);
+    when(callerDefinition.getKey()).thenReturn(BPMN_PROCESS_ID);
+    when(callerDefinition.getId()).thenReturn(DEFINITION_ID);
+    final var caller = mock(ExecutionEntity.class);
+    when(caller.getProcessDefinition()).thenReturn(callerDefinition);
+    when(caller.getProcessInstanceId()).thenReturn("the-caller");
+    when(caller.getProcessInstance()).thenReturn(caller);
+    final var callActivity = mock(ExecutionEntity.class);
+    when(callActivity.getProcessInstance()).thenReturn(caller);
+    when(callActivity.getProcessInstanceId()).thenReturn("the-caller");
+
+    final var calledDefinition = mock(ProcessDefinitionEntity.class);
+    when(calledDefinition.getTenantId()).thenReturn(MODULE_ID);
+    when(calledDefinition.getKey()).thenReturn(called);
+    when(calledDefinition.getId()).thenReturn(calledDefinitionId);
+    final var execution = mock(ExecutionEntity.class);
+    when(execution.getProcessDefinition()).thenReturn(calledDefinition);
+    when(execution.getBusinessKey()).thenReturn("4711");
+    when(execution.getProcessInstanceId()).thenReturn("the-called");
+    when(execution.getProcessInstance()).thenReturn(execution);
+    when(execution.getSuperExecution()).thenReturn(callActivity);
+    final var task = mock(DelegateTask.class);
+    when(task.getExecution()).thenReturn(execution);
+    when(task.getId()).thenReturn("the-task");
+    when(task.getEventName()).thenReturn(TaskListener.EVENTNAME_CREATE);
+
+    withTheCalledProcess.reportUserTask(task, "Activity_check", "check", UserTaskEventKind.CREATED);
+
+    assertEquals(1, publisher.userTasks().size());
+    final var reported = publisher.userTasks().getFirst();
+    // the details provider of the task is picked by this pair, see decision 16 of the repository's
+    // DECISIONS.md. The task belongs to the model of the called process, so its version counts
+    assertEquals(called, reported.bpmnProcessId());
+    assertEquals("2", reported.processVersion());
+    // and the case is still the caller's
+    assertEquals("the-caller", reported.workflowId());
 
   }
 

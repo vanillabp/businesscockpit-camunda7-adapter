@@ -62,15 +62,18 @@ public class Camunda7CockpitAutoConfiguration {
    * @param processes The claimed processes
    * @param workflowTaskWiring VanillaBP's registry, which answers whether a
    *          <code>&#64;WorkflowService</code> claims a process
+   * @param publisher The extension, which is told the user tasks of every wired model. It is
+   *          resolved when the first model is wired
    * @return This extension's place in VanillaBP's deployment pipeline, taken for a workflow
    *         module which runs on Camunda 7 and for no other
    */
   @Bean
   public ExtensionWiringService<BpmnModelInstance, Camunda7ProcessingContext> businessCockpitCamunda7WiringService(
       final Camunda7WorkflowProcesses processes,
-      final WorkflowTaskWiring workflowTaskWiring) {
+      final WorkflowTaskWiring workflowTaskWiring,
+      final ObjectProvider<BusinessCockpitEventPublisher> publisher) {
 
-    return new Camunda7CockpitWiring(processes, workflowTaskWiring);
+    return new Camunda7CockpitWiring(processes, workflowTaskWiring, publisher::getObject);
 
   }
 
