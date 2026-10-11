@@ -1,11 +1,19 @@
 package io.vanillabp.cockpit.camunda7;
 
+import java.util.function.Supplier;
+
 import org.camunda.bpm.model.bpmn.BpmnModelInstance;
+import org.camunda.bpm.model.bpmn.instance.Process;
+import org.camunda.bpm.model.bpmn.instance.UserTask;
+import org.camunda.bpm.model.xml.instance.ModelElementInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.vanillabp.camunda7.Camunda7ProcessingContext;
+import io.vanillabp.camunda7.api.Camunda7TaskDefinitions;
+import io.vanillabp.cockpit.extension.spi.BusinessCockpitEventPublisher;
 import io.vanillabp.cockpit.extension.wiring.BusinessCockpitWiringService;
+import io.vanillabp.integration.adapter.spi.NameClashAvoidanceSupport;
 import io.vanillabp.integration.adapter.spi.workflowtask.WorkflowTaskWiring;
 import io.vanillabp.integration.extension.spi.ExtensionWiringService;
 
@@ -44,6 +52,8 @@ public class Camunda7CockpitWiring implements ExtensionWiringService<BpmnModelIn
 
   private final WorkflowTaskWiring workflowTaskWiring;
 
+  private final Supplier<BusinessCockpitEventPublisher> publisher;
+
   /**
    * Builds the wiring service. It writes every claimed process it sees deployed into the given
    * store.
@@ -51,13 +61,16 @@ public class Camunda7CockpitWiring implements ExtensionWiringService<BpmnModelIn
    * @param processes Where the claimed processes are remembered
    * @param workflowTaskWiring VanillaBP's registry of what the application declared, which
    *          answers whether a <code>&#64;WorkflowService</code> claims a process
+   * @param publisher The extension, which is told the user tasks of every wired model
    */
   public Camunda7CockpitWiring(
       final Camunda7WorkflowProcesses processes,
-      final WorkflowTaskWiring workflowTaskWiring) {
+      final WorkflowTaskWiring workflowTaskWiring,
+      final Supplier<BusinessCockpitEventPublisher> publisher) {
 
     this.processes = processes;
     this.workflowTaskWiring = workflowTaskWiring;
+    this.publisher = publisher;
     // the reports ask the core later which called process shares its caller's aggregate
     processes.rememberTheCore(workflowTaskWiring);
 
@@ -106,6 +119,62 @@ public class Camunda7CockpitWiring implements ExtensionWiringService<BpmnModelIn
     // the plain process id, as the application wrote it: the core hands it over before the
     // adapter's scoping rewrote anything, which is exactly the form the cockpit reports
     processes.register(workflowModuleId, bpmnProcessId);
+
+    // the user tasks of the model, named with the values the listener reports them with. So
+    // VanillaBP holds their details providers against the version the engine gives this
+    // model, see decision 16 in the repository's DECISIONS.md
+    final var process = processInModel(model, bpmnProcessId);
+    if (process == null) {
+      return;
+    }
+    model
+        .getModelElementsByType(UserTask.class)
+        .stream()
+        .filter(userTask -> processOf(userTask) == process)
+        .forEach(userTask -> publisher
+            .get()
+            .userTaskWired(
+                workflowModuleId, bpmnProcessId, Camunda7TaskDefinitions
+                    .of(Camunda7TaskDefinitions.formKeyOf(userTask), userTask.getId()),
+                userTask.getId()));
+
+  }
+
+  /**
+   * The process of a file the core handed over. The adapter may have put the workflow module in
+   * front of its id while it prepared the model, and this class does not know which adapter
+   * prepared it. So both spellings are looked for.
+   */
+  private static Process processInModel(
+      final BpmnModelInstance model,
+      final String bpmnProcessId) {
+
+    if (model == null) {
+      return null;
+    }
+    final var scopedSuffix = NameClashAvoidanceSupport.SEPARATOR + bpmnProcessId;
+    return model
+        .getModelElementsByType(Process.class)
+        .stream()
+        .filter(process -> bpmnProcessId.equals(process.getId()) || ((process.getId() != null) && process
+            .getId()
+            .endsWith(scopedSuffix)))
+        .findFirst()
+        .orElse(null);
+
+  }
+
+  /**
+   * The process an element sits in, through every sub-process around it.
+   */
+  private static Process processOf(
+      final ModelElementInstance element) {
+
+    var parent = element.getParentElement();
+    while ((parent != null) && !(parent instanceof Process)) {
+      parent = parent.getParentElement();
+    }
+    return (Process) parent;
 
   }
 

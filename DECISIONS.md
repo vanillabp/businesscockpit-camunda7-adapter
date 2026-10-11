@@ -473,3 +473,23 @@ the instance is taken as a step, which is what every called process was before.
 one case calls a step on its own aggregate and a process with an aggregate of its own at the same
 time. It also checks the three calls of `BusinessCockpitService` which read VanillaBP's note of the
 start first (`aggregateChanged` twice and `getUserTask`), for both kinds of case.
+
+## 16. The wiring names the user tasks of a model, so their providers are checked against its version
+
+Built by story 1476 on 2026-10-11, with decision 64 of the Business Cockpit.
+
+The Business Cockpit ends the start where a user task of the deployed model has details providers
+but none of them covers the version the engine gave the model. VanillaBP does that check. It knows
+the providers, but not the user tasks of a model. So `Camunda7CockpitWiring#wireBpmn` names every
+user task of the process to the extension (`BusinessCockpitEventPublisher#userTaskWired`). It
+passes the same values the task listener reports later: the form key, or the element id where there
+is none, and the element id.
+
+The model the wiring sees may carry the process id with the workflow module in front of it. The
+wiring does not know which adapter prepared the model, so it looks for both spellings. A user task
+inside a sub-process counts for the process around it.
+
+A user task of a called process is reported with the called process and with the version of its
+process definition, not with the caller's. The version of a task provider refers to the model the
+task belongs to. `Camunda7CockpitEventsTest` holds both: the user tasks a wiring names, and the
+version a task of a called process carries.
