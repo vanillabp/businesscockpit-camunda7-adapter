@@ -152,8 +152,8 @@ the message points at.
 ## 8. An engine writing none of the history the cockpit reads ends the boot
 
 *Superseded by decision 10.* The check itself stayed, and so did the reason for it. What fell away
-is the task history: a report is built while the listener runs, so the cockpit never reads a
-historic task instance, and an engine which writes none of that runs the cockpit fine.
+is the task history. A report is built while the listener runs, so the cockpit never reads a
+historic task instance. An engine which writes no task history runs the cockpit fine.
 
 A workflow's lifecycle is what the engine wrote about the process instance. A user task somebody
 finished before its report was dispatched is read back from what it wrote about the task instance.
@@ -211,61 +211,62 @@ engine.
 
 A report is built inside the engine command which fired the event. The command has not been
 flushed yet. So the history of this very event is not in the database, and a query for it answers
-nothing at all: a workflow which was just started is not in the historic process instances, and a
-task which is being completed answers no variables any more. The old reading through the engine's
-query API therefore cannot stay where a report is built.
+nothing at all. A workflow which was just started is not in the historic process instances, and a
+task which is being completed answers no variables any more. So the old reading through the
+engine's query API cannot stay where a report is built.
 
 It does not have to. Everything a report needs is in what the engine handed over. A task listener
-gets the task, its execution and the process definition that execution runs on, and that carries
+gets the task, its execution and the process definition that execution runs on. Together they carry
 the assignee, the candidates, the due and follow-up dates, the BPMN names, the business key and
 every variable the task can see. The handler of a process-instance history event gets the business
 key, the process definition with its name and, for a start, who started the case.
 
 The query stays for what the application asks. `BusinessCockpitService.getUserTask` reads a task
 somebody names, and `aggregateChanged` says that a case changed. No event is near either of
-them, and both are about the state of now. `Camunda7CockpitBridge` therefore has two ways in, and
-which one runs is decided by the caller rather than configured: while this thread reports an event
-about that very task or that very workflow, the answer comes out of the event, and otherwise out of
-the engine. `Camunda7EventBeingReported` is what carries it from one half to the other.
+them, and both are about the state of now. So `Camunda7CockpitBridge` has two ways in. The caller
+decides which one runs, not a configuration. While this thread reports an event about that very
+task or that very workflow, the answer comes out of the event. Otherwise it comes out of the
+engine. `Camunda7EventBeingReported` carries the event from one half to the other.
 
-Three things get better. A completed task reports the variables it saw, which no later reading could
-recover. A report which waits in the outbox, because the cockpit server is down, says what
-was true when it happened rather than what is true when the server comes back. And a workflow which
-was just created is reported at all: its report used to be built from a historic process instance
-which does not exist yet.
+Three things get better. A completed task reports the variables it saw, and no later reading could
+get them back. A report which waits in the outbox, because the cockpit server is down, says what
+was true when it happened, not what is true when the server comes back. And a workflow which was
+just created is reported at all. Its report used to be built from a historic process instance which
+does not exist yet.
 
-The `initiator` of a user task is not prefilled at all. Camunda 7 records who started a case in the
-history of the process instance and nowhere else. A start event of that instance carries it, an end
-event does not repeat it, and an event about a task never had it without a second query, which is
-exactly the query this decision took out. Nothing is put there instead, and this adapter leaves the
-field empty. What a report finally carries is answered where the rule lives, which is the cockpit's
-extension: it demands an initiator and takes the value a details provider of the application set,
-or the constant for a module which knows no action a user causes. An adapter which knows nobody
-writes nobody, and that is the whole of its part.
+The `initiator` of a user task is not filled in at all. Camunda 7 records who started a case in the
+history of the process instance and nowhere else. A start event of that instance carries it, and an
+end event does not repeat it. An event about a task could only get it with a second query, and this
+decision took exactly that query out. This adapter puts nothing there and leaves the field empty.
+The cockpit's extension decides what a report finally carries, because the rule lives there. It
+demands an initiator and takes the value a details provider of the application set, or the constant
+for a module which knows no action a user causes. An adapter which knows nobody writes nobody, and
+that is all it does here.
 
 The `initiator` of a case is untouched. It is who started it, and it is reported with the case's
 creation. An end reports none, and the cockpit keeps what the creation told it.
 
 Two readings are gone with all this. A task the engine has finished with is not looked up in the
-historic task instances any more, and its candidates are not replayed from the identity-link log. The report
-of its end was built while the task was still there, and a question of the application is about a
-task which is running. Nothing else ever read them, so an engine which writes no task history runs
-this extension fine, and the boot check of decision 8 asks for the process-instance events alone.
+historic task instances any more, and its candidates are not read again from the identity-link log.
+The report of its end was built while the task was still there, and a question of the application
+is about a task which is running. Nothing else ever read them. So an engine which writes no task
+history runs this extension fine, and the boot check of decision 8 asks for the process-instance
+events alone.
 
 ## 11. Every wait for a report names the case it is about
 
 Decided on 2026-10-03.
 
 No test of this repository waits for the next report on a collecting path any more. A wait on
-`/usertask/created` or `/workflow/created` names the business key of the case it is about, which is
-what every report of that case carries and no other report does. Nine waits were on such a path,
+`/usertask/created` or `/workflow/created` names the business key of the case it is about. Every
+report of that case carries that key, and no other report does. Nine waits were on such a path,
 and the cockpit server of the test refuses them from now on.
 
 Why:
 
 Every test of a module reports into one server, and the dispatch of an outbox entry outlives the
-test which caused it. A report of an earlier test therefore arrives on a collecting path at any
-moment, and a wait which takes the next report of its kind is satisfied by it. The test then walks
+test which caused it. So a report of an earlier test can arrive on a collecting path at any moment.
+A wait which takes the next report of its kind then accepts that report. The test then walks
 on although nothing it provoked has happened yet. Four of these nine had a `forgetRequests()`
 behind them, three of them on the very next line, and that forget threw away the report the test
 had really been waiting for.
@@ -285,8 +286,8 @@ It is a method now, `reportsOf(aggregate)`, so the class says it once instead of
 business key answers for both paths, because the report of a user task carries the key of its case
 as well.
 
-`Camunda7TwoAdapterIdsTest` kept the started case in a variable to be able to name it. It started
-one and threw the result away.
+`Camunda7TwoAdapterIdsTest` now keeps the started case in a variable, so it can name it. Before, it
+started a case and threw the result away.
 
 What stays:
 
@@ -294,7 +295,7 @@ The `forgetRequests()` calls stay where they are. A test which provokes two repo
 case tells them apart by waiting for the first, forgetting it and waiting again, and the
 identifier alone cannot do that. Only the wait in front of such a forget was wrong.
 
-The other `awaitAnyRequest` calls stay as they are: they wait on `/usertask/<id>/completed`,
+The other `awaitAnyRequest` calls stay as they are. They wait on `/usertask/<id>/completed`,
 `/workflow/<id>/cancelled` and the like, and only the case under test can report there.
 
 Where this is referred to, each in its own words rather than by number:
@@ -352,8 +353,8 @@ This entry adds to decision 2.
 
 ### What changed around this adapter
 
-The platform now asks every task of a claimed process for a `@WorkflowTask` method or for the line
-`implemented-externally=true`. Without either, the start ends. The platform states this rule in the
+The platform now asks for a `@WorkflowTask` method or the line `implemented-externally=true` for
+every task of a claimed process. Without either, the start ends. The platform states this rule in the
 decision log of `adapter-platform-integration`. Before it, the Camunda 7 adapter let a user task
 without a method pass and named it once at INFO, and nothing was refused. The test applications of
 this repository relied on that. Their user tasks have a `@UserTaskDetailsProvider` and no method,
@@ -370,9 +371,9 @@ which has no method needs the line, the same as in any other application.
 The test applications write the line at the task, by element id, one line per user task. That is the
 narrowest place the key has. A line at the workflow or at the workflow module would also work, but
 it would quietly cover a user task added to a test model later. The start would then no longer tell
-anybody that the new task has neither a method nor a line. The element id is used rather than the
-form key because one test process has a user task without a form key, and because the element id is
-where the configuration of a task is going.
+anybody that the new task has neither a method nor a line. The tests use the element id, not the
+form key. One test process has a user task without a form key, and the configuration of a task is
+moving to the element id anyway.
 
 No test of this repository checked that an unserved user task passes. The test for a user task
 without a form key now marks that task by its element id, and still checks that the cockpit is told
@@ -395,8 +396,8 @@ into three kinds:
   `vanillabp.workflow-modules.<wm>.workflows.<id>.implemented-externally=true`.
 - C: the process is foreign. It is only in the engine, for example deployed through the Camunda API.
 
-The platform rule is that VanillaBP leaves B and C as they were modelled: no listener and no change
-to the BPMN, and nothing reacts to them. This extension follows the same rule:
+The platform rule is that VanillaBP leaves B and C as they were modelled. They get no listener and
+no change to the BPMN, and nothing reacts to them. This extension follows the same rule:
 
 - `Camunda7CockpitWiring.wireBpmn` remembers a process only if it is A. The core calls `wireBpmn`
   for B too, so the extension asks itself, through
@@ -405,11 +406,11 @@ to the BPMN, and nothing reacts to them. This extension follows the same rule:
   Boot and on Quarkus, and it builds no answer of its own out of the election or out of
   `resolveWorkflowAggregateIdName`.
 - `Camunda7UserTaskParseListener` attaches the cockpit's listeners only to user tasks of a remembered
-  process. It looks the process up by the tenant and the process definition key the engine stores,
-  the same lookup decision 4 describes for events. So the listener and the report always agree on
-  which processes count, also for a process of another workflow module of the same application.
-  Where the module deploys into a tenant, a foreign process without a tenant does not match, even
-  when it has the id of a claimed process.
+  process. It looks the process up by the tenant and the process definition key the engine stores.
+  That is the same lookup decision 4 describes for events. So the listener and the report always
+  agree on which processes count, also for a process of another workflow module of the same
+  application. If the module deploys into a tenant, a foreign process without a tenant does not
+  match, even when it has the id of a claimed process.
 - `Camunda7CockpitEvents` reports nothing about a process it cannot look up. A process of B or C is
   never remembered, so its tasks and its workflows are never reported, also when the process
   instance carries a business key.
@@ -432,7 +433,7 @@ now includes B.
 Decision 3 said that only root process instances are reported. That is true only for a called
 process which shares the workflow aggregate of its caller. A called process with an aggregate of its
 own is a business case of its own. The core starts it as a workflow of its own and builds its
-aggregate, the Camunda 7 adapter writes that aggregate's id into the business key, and the cockpit
+aggregate. The Camunda 7 adapter writes that aggregate's id into the business key. And the cockpit
 now shows it as a case too. This follows decision 61 of `business-cockpit` (story 1472):
 notifications form one group per case, and only a process with its own aggregate forms a group of its
 own.
@@ -445,8 +446,8 @@ Shipping has its own, the case of Packing is Shipping.
 **The core decides which processes share an aggregate.** The extension asks
 `WorkflowTaskWiring#workflowsShareTheWorkflowAggregate` with the plain process ids. The Camunda 7
 adapter asks the same question for its call activities (`Camunda7CallActivities`). The extension
-builds no check of its own, and it does not use `BpmsInitiatedStartInvoker#startsAWorkflowOfItsOwn`:
-that answer is `true` for a process nobody declares and says nothing about the caller. A process the
+builds no check of its own, and it does not use `BpmsInitiatedStartInvoker#startsAWorkflowOfItsOwn`.
+That answer is `true` for a process nobody declares and says nothing about the caller. A process the
 application does not claim is unknown to the core and shares nothing. So a call from such a process
 starts a case of its own. VanillaBP does not design for processes it did not deploy, so this is
 accepted.
@@ -460,7 +461,7 @@ What changes:
   where that is another one.
 - `workflowsOfAggregate` keeps a called instance which does not share its caller's aggregate.
 - `userTasksOfAggregate` and `userTaskOfAggregate` answer only tasks of a process which works on the
-  aggregate asked about. The business key alone does not say that: two aggregate classes may count
+  aggregate asked about. The business key alone does not say that. Two aggregate classes may count
   their ids alike, and then a task of a case of its own carried the same key as the caller's case.
 
 **Two ways to walk.** A report at an event walks the executions the engine holds in its running

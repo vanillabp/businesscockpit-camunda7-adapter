@@ -205,7 +205,7 @@ public class Camunda7CockpitEvents {
     }
     // the cockpit shows business cases. A called process which shares its caller's workflow
     // aggregate is a step of the caller's case, and one with an aggregate of its own is a case
-    // of its own - see decisions 3 and 15 in the repository's DECISIONS.md
+    // of its own. See decisions 3 and 15 in the repository's DECISIONS.md
     if (isAStepOfItsCaller(event)) {
       return;
     }

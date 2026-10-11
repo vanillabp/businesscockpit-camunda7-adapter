@@ -14,8 +14,8 @@ Somebody added one dependency to see their user tasks in the cockpit. Every jar 
 for is one more thing to ship and to answer a CVE report about.
 
 Writing `<optional>true</optional>` in a `dependencyManagement` does not do it. Maven copies a
-managed version, scope and exclusions into a dependency and leaves the optional flag behind, so
-the POM we publish says nothing at all about that dependency.
+managed version, scope and exclusions into a dependency, but not the optional flag. So the POM we
+publish says nothing at all about that dependency.
 
 The two cases differ, and a sentence written for one does not fit the other. A declaration without
 a scope hands the jar to every application, and that is a defect. An `optional` in a

@@ -53,8 +53,8 @@ What the core does, class by class:
   built-in listener of all four task events.
 - `Camunda7WorkflowHistoryHandler` turns the engine's process-instance history events into the
   cockpit's workflow events.
-- `Camunda7CockpitEvents` is what both of them report through: it builds the identifiers and hands
-  the event to the cockpit, which builds the report there and then and writes one outbox entry.
+- `Camunda7CockpitEvents` is what both of them report through. It builds the identifiers and hands
+  the event to the cockpit. The cockpit builds the report right away and writes one outbox entry.
 - `Camunda7EventBeingReported` holds what the engine handed over while that report is built. It is
   how the bridge answers out of the event instead of querying an engine which cannot answer yet.
 - `Camunda7CockpitBridge` answers everything the cockpit asks about a task or a workflow. At an
@@ -64,8 +64,8 @@ What the core does, class by class:
   prefix or a tenant of its own. Two of those answers are the Camunda 7 adapter's: the tenant a
   workflow module was deployed under, and whether the engine's work runs in the caller's
   transaction. The extension reads both per configured adapter id. The version of a deployed
-  process comes from there too: what the listeners report and what the bridge reads back have to
-  name one deployment the same way.
+  process comes from there too, because the listeners and the bridge have to name one deployment
+  the same way.
 
 The decisions these classes rest on are numbered in [`DECISIONS.md`](./DECISIONS.md), and what a
 user of this extension has to know is in the
@@ -108,7 +108,7 @@ The build reads the snapshots of the platform and of the cockpit from the snapsh
 Maven Central, `https://central.sonatype.com/repository/maven-snapshots/`. The parent
 `io.vanillabp:release-parent` names that repository, and reading it needs no login. The snapshot of
 the Camunda 7 adapter is the exception. Its namespace belongs to the Camunda Community Hub, so it is
-published to `https://maven.pkg.github.com/camunda-community-hub/vanillabp-camunda7-adapter`, and
+published to `https://maven.pkg.github.com/camunda-community-hub/vanillabp-camunda7-adapter`.
 GitHub Packages asks for a token even for a public package. A local build needs that repository in
 `~/.m2/settings.xml`, with a GitHub token which has the scope `read:packages`. CI reads it through
 [.github/workflows/github-packages-settings.xml](./.github/workflows/github-packages-settings.xml).
@@ -126,20 +126,20 @@ like the rest of the Business Cockpit.
    `test-coverage-report/quarkus/report`
 
 Coverage is measured separately per platform, because the tests of one platform never run the
-other platform's code. The core is in both reports, and a core class one platform never reaches
-names a feature that platform never runs. Click a badge at the top of this page to open the
+other platform's code. The core is in both reports. If one platform never reaches a class of the
+core, that platform never runs the feature of that class. Click a badge at the top of this page to open the
 published report.
 
 The last module of the reactor is `test-coverage-report/coverage-gate`. It reads both reports and
-breaks the build when a platform is below its threshold in the root POM
-(`coverage.threshold.spring-boot`, `coverage.threshold.quarkus`, in percent of covered
-instructions, which is the number the badges show). Both hold 85, the number every VanillaBP
-repository stops at, and that is not the target: the rule is `coverage.rule` in the same POM, 90
-per platform, so a report between 85 and 90 passes the build and still names a gap. The gate is
-where a gap has grown too big to carry, which is why it is never edited to make a build pass. It
-also compares every module producing a `jacoco.exec` with the two aggregates, so a module added to
-the build without being added to a report cannot stay unnoticed. `CoverageGateTest` is where all
-of that happens.
+breaks the build when a platform is below its threshold in the root POM. The thresholds are
+`coverage.threshold.spring-boot` and `coverage.threshold.quarkus`, in percent of covered
+instructions. That is the number the badges show. Both hold 85, the number every VanillaBP
+repository stops at. 85 is not the target. The rule is `coverage.rule` in the same POM, 90 per
+platform, so a report between 85 and 90 passes the build and still names a gap. The gate marks a
+gap which has grown too big to carry, so nobody edits it to make a build pass. The gate also
+compares every module which writes a `jacoco.exec` with the two aggregates. So nobody can add a
+module to the build and forget to add it to a report. `CoverageGateTest` is where all of that
+happens.
 
 The gate reports what it measured on every run, green ones included, so it is the one test class
 of this repository which prints while it passes. The angle brackets stand for the numbers of the
@@ -151,8 +151,8 @@ coverage gate | Quarkus: <percent> % instructions (<missed> of <total> missed) |
 ```
 
 The reports are written in the `verify` phase, so a run which stops at `package` never gets there.
-`mvn package` checks no threshold at all: the gate then prints a line per platform saying that the
-coverage was not checked, and those two tests are reported as skipped, instead of failing over a
+`mvn package` checks no threshold at all. The gate then prints a line per platform which says that
+the coverage was not checked, and it reports those two tests as skipped. It does not fail over a
 file the run could not have written.
 
 ## What CI runs
@@ -176,10 +176,10 @@ joins the publish's group, so it never takes the place of a waiting publish. A r
 one issue with the label `nightly-build`, and a night which is still red is a comment on that
 issue. A green night after a red one is a comment too, and somebody closes the issue by hand.
 
-`publish-snapshots.yaml` also publishes the two coverage reports to GitHub Pages, which is
-what the badges at the top of this page link to. `deploy` runs every phase the pull-request build
-runs, so the number covers the whole test suite: on both platforms the tests boot a real
-application against an embedded Camunda 7 engine.
+`publish-snapshots.yaml` also publishes the two coverage reports to GitHub Pages, and the badges at
+the top of this page link there. `deploy` runs every phase the pull-request build runs, so the
+number covers the whole test suite. On both platforms the tests boot a real application against an
+embedded Camunda 7 engine.
 
 ## Noteworthy & Contributors
 
