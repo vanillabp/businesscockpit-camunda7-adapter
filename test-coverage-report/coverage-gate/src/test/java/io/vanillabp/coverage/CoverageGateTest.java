@@ -14,13 +14,13 @@ import io.vanillabp.integration.test.utils.CoverageGate;
 import io.vanillabp.integration.test.utils.PrintsWhenPassing;
 
 /**
- * The coverage gate. It breaks the build when the aggregated coverage of a platform drops below
- * the threshold, so a drop is noticed when it happens and not a year later. The threshold is 85
- * in every VanillaBP repository, and the rule is 90. The gap keeps one bad week of a repository
- * from being answered by editing the number.
+ * The coverage gate. It breaks the build when the aggregated coverage of a platform drops
+ * below its threshold, so a drop is noticed when it happens and not a year later. The rule is 90
+ * in every VanillaBP repository. The threshold sits below it, so one bad week of a repository is
+ * not answered by editing the number.
  * <p>
  * JaCoCo's own <code>check</code> goal cannot do this. It judges the classes of ONE module
- * against ONE execution data file, but both numbers of this repository come from aggregated
+ * against ONE execution data file, but the numbers of this repository come from aggregated
  * reports over many modules. So the gate reads exactly the report which is published, and
  * report and gate never disagree.
  * <p>
@@ -28,17 +28,17 @@ import io.vanillabp.integration.test.utils.PrintsWhenPassing;
  * aggregate fails builds for coverage which exists but is not counted, and no new test can fix
  * that.
  * <p>
- * This is the only test class in VanillaBP which prints while it passes, so it is the only one
- * without {@code SuppressOutputExtension}. Everywhere else a passing test prints nothing, because
- * output nobody reads hides the output somebody has to read. Here the passing run IS the
- * measurement. It is the only place where the build says how far each platform is from the
- * rule. Without it, a repository between the threshold and the rule has a gap which only
- * somebody who opens the report sees.
+ * This is the only test class of this repository which prints while it passes, so it is the
+ * only one without {@code SuppressOutputExtension}. Everywhere else a passing test prints
+ * nothing, because output nobody reads hides the output somebody has to read. Here the passing
+ * run IS the measurement. It is the only place where the build says how far each platform is
+ * from the rule. Without it, a repository between the threshold and the rule has a gap which
+ * only somebody who opens the report sees.
  */
 @PrintsWhenPassing(
-  "the measurement is the result - what each platform reached belongs in the log of every "
-      + "build and not only of a red one, so whoever just wrote tests reads there whether the "
-      + "gap to the rule got smaller")
+  "the measurement is the result: what each platform reached belongs in the log of every build "
+      + "and not only of a red one, so whoever just wrote tests reads there whether the gap to the "
+      + "rule got smaller")
 public class CoverageGateTest {
 
   private static final Path ROOT = CoverageGate.repositoryRoot("coverage.repository.root");
@@ -64,7 +64,7 @@ public class CoverageGateTest {
 
   /**
    * Modules whose execution data belongs to no coverage report. Each entry is a decision. A
-   * module which is missing here and from both aggregates is the defect this test looks for.
+   * module which is missing here and from every aggregate is the defect this test looks for.
    */
   private static final Set<String> DELIBERATELY_NOT_AGGREGATED = Set.of();
 
@@ -102,8 +102,8 @@ public class CoverageGateTest {
    * run for a checked one.
    * <p>
    * The threshold is read per platform, because there is one report per platform. Both
-   * properties hold the same 85 in every VanillaBP repository. That number is the floor against
-   * a regression and not the goal. The goal is the {@code coverage.rule} property. A repository
+   * properties hold the same 85 in every VanillaBP repository. A threshold is the floor against a
+   * regression and not the goal. The goal is the {@code coverage.rule} property. A platform
    * between the two still owes a test for the gap.
    */
   private void assertAboveThreshold(

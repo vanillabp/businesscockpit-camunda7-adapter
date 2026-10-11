@@ -14,11 +14,11 @@ import io.vanillabp.integration.test.utils.SuppressOutputExtension;
  * which use our artifacts.
  * <p>
  * Lombok and the annotation processors of Quarkus and Spring Boot are used while javac runs.
- * Once the class file exists, they have nothing left to do. Somebody added one dependency to see
- * their user tasks in the cockpit. Every jar they did not ask for is one more thing to ship and
- * to answer a CVE report about. The scope for such a tool is {@code provided}: it puts the jar on
- * our own compile path and hands it to nobody. The section "What a POM hands an application" of
- * the AGENTS.md of this repository says the same in words. This test turns it into a gate.
+ * Once the class file exists, they have nothing left to do. An application asked for the
+ * cockpit, not for them. Every jar it did not ask for is one more thing to ship and to answer a
+ * CVE report about. The scope for such a tool is {@code provided}: it puts the jar on our own
+ * compile path and hands it to nobody. The section "What a POM hands an application" of the
+ * AGENTS.md of this repository says the same in words. This test turns it into a gate.
  * <p>
  * The check itself is in {@link PublishedPoms} in the module 'test-utils' of the platform. Every
  * VanillaBP repository can make this mistake, and they all make it in the same way. So the rule
