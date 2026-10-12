@@ -59,7 +59,7 @@ public class Camunda7WorkflowProcesses {
    * Whether a called process works on the workflow aggregate of the process which called it.
    * The core answers it (<code>WorkflowTaskWiring#workflowsShareTheWorkflowAggregate</code>), the
    * same answer the Camunda 7 adapter uses for its call activities. Nothing is decided here. See
-   * decision 15 in the repository's DECISIONS.md.
+   * decision 3 in the repository's DECISIONS.md.
    *
    * @param calling The calling process
    * @param called The called process

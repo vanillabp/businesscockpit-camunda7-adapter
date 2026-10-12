@@ -135,7 +135,7 @@ public class Camunda7CockpitCustomizer implements Camunda7EngineCustomizer {
 
   /**
    * Asks the engine's history level whether it produces the events the cockpit reads and ends
-   * the boot where it does not - see decision 8 in the repository's DECISIONS.md.
+   * the boot where it does not - see decision 7 in the repository's DECISIONS.md.
    * <p>
     * A plugin rather than a line in {@link Camunda7CockpitCustomizer#customize}, because the
     * level read while an engine is being customized is not the level that engine runs with. An
