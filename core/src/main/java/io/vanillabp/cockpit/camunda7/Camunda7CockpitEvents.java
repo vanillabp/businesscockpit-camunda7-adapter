@@ -205,7 +205,7 @@ public class Camunda7CockpitEvents {
     }
     // the cockpit shows business cases. A called process which shares its caller's workflow
     // aggregate is a step of the caller's case, and one with an aggregate of its own is a case
-    // of its own. See decisions 3 and 15 in the repository's DECISIONS.md
+    // of its own. See decision 3 in the repository's DECISIONS.md
     if (isAStepOfItsCaller(event)) {
       return;
     }
@@ -253,7 +253,8 @@ public class Camunda7CockpitEvents {
    * Whether the instance of a history event is a step of the case of the instance which called
    * it. The caller runs while the instance it called starts or ends, so the running command holds
    * it. Where it does not, the instance is taken as a step, which is what every called process
-   * was before decision 15.
+   * was before a called process could be a case of its own. See decision 3 in the repository's
+   * DECISIONS.md.
    */
   private boolean isAStepOfItsCaller(
       final HistoricProcessInstanceEventEntity event) {

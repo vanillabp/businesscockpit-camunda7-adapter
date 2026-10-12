@@ -45,7 +45,7 @@ no title but a name from the BPMN is more useful than a task which is not there.
 An application upgrading from version 1 will see tasks appear which did not appear before. The wiki
 names it, under what changes for a version 1 application.
 
-## 3. A workflow's lifecycle is read from the engine's history, and only for root instances - a called process with an aggregate of its own counts as a root since decision 15
+## 3. A workflow's lifecycle is read from the engine's history, and only for an instance which is a case of its own
 
 The extension learns that a workflow started, ended or was cancelled from a handler for the
 engine's process-instance history events, installed next to the engine's own handler. The
@@ -57,9 +57,51 @@ the outside never reaches an end event, and the engine records that as an end ca
 reason. So `START` becomes created. An `END` with a delete reason becomes cancelled, and any other
 `END` becomes completed. Anything else about the instance becomes an update.
 
-Only root process instances are reported. A called process is a step of a business case rather
-than a case of its own. For the same reason, the reads answering the cockpit's questions about the
-workflows of an aggregate leave the called ones out.
+Only an instance which is a business case of its own is reported. A root instance is one. A called
+process which shares the workflow aggregate of its caller is a step of the caller's case, not a case
+of its own. A called process with an aggregate of its own is a case of its own: the core starts it
+as a workflow of its own and builds its aggregate, and the Camunda 7 adapter writes that aggregate's
+id into the business key. This follows decision 61 of `business-cockpit`: notifications form one
+group per case, and only a process with its own aggregate forms a group of its own.
+
+**The case of an instance** is the highest instance above it which can be reached by calls that
+share the aggregate. The walk goes up the call hierarchy and stops at the first caller which does not
+share it. In a chain Order → Shipping → Packing, where Packing works on Shipping's aggregate and
+Shipping has its own, the case of Packing is Shipping.
+
+**The core decides which processes share an aggregate.** The extension asks
+`WorkflowTaskWiring#workflowsShareTheWorkflowAggregate` with the plain process ids. The Camunda 7
+adapter asks the same question for its call activities (`Camunda7CallActivities`). The extension
+builds no check of its own, and it does not use `BpmsInitiatedStartInvoker#startsAWorkflowOfItsOwn`.
+That answer is `true` for a process nobody declares and says nothing about the caller. A process the
+application does not claim is unknown to the core and shares nothing. So a call from such a process
+starts a case of its own. VanillaBP does not design for processes it did not deploy, so this is
+accepted.
+
+What follows from it:
+
+- The history handler reports the start and the end of a root instance, and of a called instance
+  which does not share its caller's aggregate. A called instance is started without a business key,
+  so its start is reported once the adapter wrote the name, as decision 12 says.
+- A user task names the case as `workflowId`, and the instance it sits in as `subWorkflowId` only
+  where that is another one.
+- The reads answering the cockpit's questions about the workflows of an aggregate leave the steps
+  out. `workflowsOfAggregate` keeps a called instance which does not share its caller's aggregate.
+- `userTasksOfAggregate` and `userTaskOfAggregate` answer only tasks of a process which works on the
+  aggregate asked about. The business key alone does not say that. Two aggregate classes may count
+  their ids alike, and then a task of a case of its own would carry the same key as the caller's
+  case.
+
+**Two ways to walk.** A report at an event walks the executions the engine holds in its running
+command, because an instance started in the same command is not in the history yet. A read outside
+of such a command walks the history, which still knows an instance which ended. The class is
+`Camunda7BusinessCases`. Where the running command does not hold the caller of a history event,
+the instance is taken as a step.
+
+`Camunda7BusinessCasesTest` shows both walks. `Camunda7CalledProcessCaseTest` shows it on an engine:
+one case calls a step on its own aggregate and a process with an aggregate of its own at the same
+time. It also checks the three calls of `BusinessCockpitService` which read VanillaBP's note of the
+start first (`aggregateChanged` twice and `getUserTask`), for both kinds of case.
 
 ## 4. An engine's identifiers are translated back through the deployed processes, never by parsing - only claimed processes are remembered, see decision 14
 
@@ -81,126 +123,82 @@ of an earlier release.
 
 ## 5. The outbox entry is written in the engine's transaction, unless the engine has its own
 
-*Superseded by decision 6.* It read the data source name as the answer to a question about
-transactions, which is wrong on Quarkus.
+The entry reporting what the engine did belongs in the transaction that work happens in. The
+cockpit then hears about a task if and only if the workflow which created it was committed, and a
+rolled-back workflow leaves nothing behind.
 
-An embedded Camunda 7 engine on the application's data source runs its listeners inside the
-application's transaction. The entry reporting what the engine did is written in that same
-transaction. The cockpit therefore hears about a task if and only if the workflow which created it
-was committed, and nothing is reported for work which was rolled back.
+Whether such a transaction exists is the Camunda 7 adapter's answer, not a property of this
+extension. The adapter gives it as `Camunda7EngineFacts.joinsTheApplicationTransaction()`, and the
+answer is the same sentence on both platforms. An engine on the application's data source joins the
+caller's transaction, so the entry is written in it. On Spring Boot such an engine is built with the
+application's own transaction manager, and its commands run in the application's transaction. An
+engine which runs on a data source of its own, given with
+`vanillabp.adapters.<id>.data-source-name`, does not join the caller's transaction. So the entry
+gets a transaction of its own.
 
-An engine configured with `vanillabp.adapters.<id>.data-source-name` commits on its own, and there
-is no such transaction to join, so the entry gets one of its own. That is the honest answer rather
-than a correct one. The entry and the engine's work then commit separately, and a crash between the
-two can leave the cockpit told about something the engine rolled back, or the other way round. The
-engine's own transaction is the only place that could be fixed, and an engine which does not share
-the application's data source has no such place.
+That is the honest answer rather than a correct one. The entry and the engine's work then commit
+separately, and a crash between the two can leave the cockpit told about something the engine
+rolled back, or the other way round. The engine's own transaction is the only place that could be
+fixed, and an engine which does not share the application's data source has no such place. An
+application which wants the two committed together puts the engine on the application's data
+source, and then the answer is `true` on either platform.
+
+On Quarkus the engine runs on the engine's JTA configuration with the container's transaction
+manager, so every command is enlisted in the transaction of whoever called it. That says nothing
+about atomicity. A JTA transaction around two data sources which are not XA is still two commits,
+so an entry written there would only look like part of the engine's transaction. Configuring both
+data sources as XA is not asked for. The answer is the one above, on Quarkus as on Spring Boot.
+
+The extension does not read the data source key to answer this. A named data source decides which
+database the engine writes to, and it is the adapter which knows what that means for transactions.
 
 ## 6. Which transaction the entry is written in is answered by the platform, not by a property - the Quarkus answer superseded by decision 9
 
-The entry reporting what the engine did belongs in the transaction that work happens in. The
-cockpit then hears about a task if and only if the workflow which created it was committed, and a
-rolled-back workflow leaves nothing behind. Whether such a transaction exists is decided by how a
-platform ties its engine into transactions. Only the platform modules of this repository know that,
-so they answer it and the platform-neutral half asks.
+*Merged into decision 5 on 2026-10-12, before the 1.0 release.* Decision 5 now says that the Camunda
+7 adapter answers whether the entry joins the engine's transaction, and what it costs where it does
+not.
 
-On Spring Boot an engine on the application's data source is built with the application's own
-transaction manager, and its commands run in the application's transaction. An engine which was
-given `vanillabp.adapters.<id>.data-source-name` is built with a transaction manager of its own,
-and its commands commit without the application noticing. There the entry gets a transaction of
-its own, which is the honest answer rather than a correct one: entry and engine work then commit
-separately, and a crash between the two can leave the cockpit told about something the engine
-rolled back.
+## 7. An engine writing none of the process history the cockpit reads ends the boot
 
-On Quarkus the adapter builds the engine on the engine's JTA configuration with the container's
-transaction manager. Every command therefore joins the transaction of whoever called it, including
-the engine of an adapter id which names a data source of its own. A named data source decides which
-database the engine writes to and nothing about who commits it. Reading that key here, as
-decision 5 did, would open a second transaction for the entry while the engine's own work is
-still uncommitted, and a rollback would leave the cockpit showing a task which never existed.
+The cockpit learns that a workflow started, ended or was cancelled from what the engine writes about
+the process instance (decision 3). At history level `none` the engine writes none of it, and an
+application configured that way would run with a cockpit which shows no case and says nothing about
+why. Camunda writes the process-instance events from history level `activity` upwards. So
+`activity` is the lowest level an application can run this extension on, and `none` is the only one
+of Camunda's own levels which leaves the cockpit with nothing.
 
-This costs an application which gives its Quarkus engine a database of its own. The entry and the
-engine's work are then two data sources in one JTA transaction, and Agroal enlists a second data
-source only as an XA resource. Both have to be configured with
-`quarkus.datasource.<name>.jdbc.transactions: xa`, or writing the entry fails while the engine
-works. That is the price of the guarantee, and it is named in the wiki rather than worked
-around here.
+The task history is not needed. A report is built while the listener runs (decision 10). So the
+cockpit never reads a historic task instance, and it does not read the candidates of a task from the
+identity-link log either. An engine which writes no task history runs the cockpit fine. What `audit`
+and `full` add on top is variable, form-property and identity-link history, and the cockpit reads
+none of it.
 
-## 7. An engine keeping less history than `audit` ends the boot
+The check asks the level instead of comparing its name against a list. A history level is an object
+an application may bring along itself through `setCustomHistoryLevels`, and it answers per event
+type. Asked with no entity it says whether it writes events of that type at all, which is exactly
+what is being asked here. A list of names would judge a level nobody but the application knows, and
+it would wave through a level called `activity` which somebody replaced with one writing less.
 
-*Superseded by decision 8.* It named `audit` as the lowest level which works, on the assumption
-that `activity` writes no task history. It does:
-`org.camunda.bpm.engine.impl.history.HistoryLevelActivity` produces the task-instance events as
-well as the process-instance ones, and what `audit` adds is variable and form-property history,
-which the cockpit does not read.
+Where an event the cockpit reads is missing, the boot ends. The message names the engine's level,
+the events it does not write, the lowest level which writes them, and the fact that the engine's own
+default already does. An application which never touched the level will therefore never see it.
 
-Everything the cockpit shows about a workflow comes from the engine's history. The lifecycle is
-read from the process-instance history events, and a task somebody finished before the report was
-dispatched is read from the historic task instance. At history level `none` the engine writes
-neither, and at `activity` it writes no task history. An application configured that way would
-run with a cockpit which stays empty and says nothing about why.
-
-So the extension asks the engine which level it ended up with and ends the boot below `audit`. The
-message names the level it found, the two levels which work, and the fact that the engine's own
-default is one of them. It asks through an engine plugin of its own rather than while it customizes
-the configuration. The customizers run before the plugins of the application, which is where a level
-is set, and `auto` names no level at all until the engine has read the one its database was created
+The extension asks through an engine plugin of its own rather than while it customizes the
+configuration. The customizers run before the plugins of the application, which is where a level is
+set, and `auto` names no level at all until the engine has read the one its database was created
 with. The level is not a key of this extension and not one of the Camunda 7 adapter either. An
-application which sets it does so through an engine plugin or a customizer of its own, which is what
-the message points at.
+application which sets it does so through an engine plugin or a customizer of its own.
 
 ## 8. An engine writing none of the history the cockpit reads ends the boot
 
-*Superseded by decision 10.* The check itself stayed, and so did the reason for it. What fell away
-is the task history. A report is built while the listener runs, so the cockpit never reads a
-historic task instance. An engine which writes no task history runs the cockpit fine.
-
-A workflow's lifecycle is what the engine wrote about the process instance. A user task somebody
-finished before its report was dispatched is read back from what it wrote about the task instance.
-Camunda writes both from history level `activity` upwards. What `audit` adds on top is variable and
-form-property history, and the cockpit reads neither. So `activity` is the lowest level an
-application can run this extension on, and `none` is the only one of Camunda's own levels which
-leaves the cockpit with nothing.
-
-The candidates of a finished task are the one thing which does need more. They come from the
-identity-link log, which Camunda keeps at `full` alone. Below that, such a task is reported without
-candidates rather than with wrong ones. That is a task shown with less detail, not a cockpit which
-stays empty, so it is no reason to end a boot.
-
-The check asks the level instead of comparing its name against a list. A history level is an
-object an application may bring along itself through `setCustomHistoryLevels`, and it answers per
-event type. Asked with no entity it says whether it writes events of that type at all, which is
-exactly what is being asked here. A list of names would judge a level nobody but the application
-knows, and it would wave through a level called `activity` which somebody replaced with one
-writing less.
-
-Where an event the cockpit reads is missing, the boot ends. The message names the engine's level,
-the events it does not write, the lowest level which writes them, and the fact that the engine's
-own default already does. An application which never touched the level will therefore never see it.
+*Merged into decision 7 on 2026-10-12, before the 1.0 release.* Decision 7 now says which history
+the cockpit reads, and that an engine which writes none of it ends the boot.
 
 ## 9. The adapter answers whether the entry joins the engine's transaction, and it answers the same on both platforms
 
-The guarantee is the one decision 6 wrote down, and it has not changed: the entry reporting what
-the engine did belongs in the transaction that work happens in, so a rolled-back workflow leaves
-nothing behind. What changed is who answers the question, and what the answer is on Quarkus.
-
-The Camunda 7 adapter answers it now, as `Camunda7EngineFacts.joinsTheApplicationTransaction()`.
-The answer is the same sentence on both platforms: an engine which runs on a data source of
-its own does not join the caller's transaction, so the entry gets a transaction of its own.
-
-Decision 6 said the opposite for Quarkus. It argued that the container's transaction manager
-makes every command join the transaction of whoever called it, and that a named data source
-decides only which database is written to. That is true about enlistment and untrue about
-atomicity. A JTA transaction around two data sources which are not XA is still two commits, so
-the entry and the engine's work were never committed together. What the old answer bought was
-the appearance of one transaction, and the price it named was configuring both data sources as
-XA. That price is gone with the answer.
-
-What an application gives up is what the Spring Boot half of decision 6 already named as the
-honest answer rather than the correct one. Entry and engine work commit separately, and a crash
-between the two can leave the cockpit told about something the engine rolled back. An
-application which wants them committed together puts the engine on the application's data
-source, and then this answer is `true` on either platform.
+*Merged into decision 5 on 2026-10-12, before the 1.0 release.* Decision 5 now says that the
+adapter's answer is the same on Spring Boot and on Quarkus, and why the old Quarkus answer was
+dropped.
 
 ## 10. The report is built at the event, out of what the engine handed over
 
@@ -250,7 +248,7 @@ Two readings are gone with all this. A task the engine has finished with is not 
 historic task instances any more, and its candidates are not read again from the identity-link log.
 The report of its end was built while the task was still there, and a question of the application
 is about a task which is running. Nothing else ever read them. So an engine which writes no task
-history runs this extension fine, and the boot check of decision 8 asks for the process-instance
+history runs this extension fine, and the boot check of decision 7 asks for the process-instance
 events alone.
 
 ## 11. Every wait for a report names the case it is about
@@ -325,7 +323,7 @@ moment as its time.
 arrived once, as `/workflow/<id>/updated`, 11 milliseconds after the instance started. A start
 through `ProcessService` arrived once, as `/workflow/created`, at the moment the instance started.
 
-The cockpit server creates a case from a change it never saw created, which is decision 36 in
+The cockpit server creates a case from a change it never saw created, which is decision 18 in
 `business-cockpit`. So the case was there, but it began at the time of the change.
 
 A start without a business key is remembered, with the moment it started. The next update of that
@@ -430,50 +428,8 @@ now includes B.
 
 ## 15. A called process with a workflow aggregate of its own is a case of its own
 
-Decision 3 said that only root process instances are reported. That is true only for a called
-process which shares the workflow aggregate of its caller. A called process with an aggregate of its
-own is a business case of its own. The core starts it as a workflow of its own and builds its
-aggregate. The Camunda 7 adapter writes that aggregate's id into the business key. And the cockpit
-now shows it as a case too. This follows decision 61 of `business-cockpit` (story 1472):
-notifications form one group per case, and only a process with its own aggregate forms a group of its
-own.
-
-**The case of an instance** is the highest instance above it which can be reached by calls that
-share the aggregate. The walk goes up the call hierarchy and stops at the first caller which does not
-share it. In a chain Order → Shipping → Packing, where Packing works on Shipping's aggregate and
-Shipping has its own, the case of Packing is Shipping.
-
-**The core decides which processes share an aggregate.** The extension asks
-`WorkflowTaskWiring#workflowsShareTheWorkflowAggregate` with the plain process ids. The Camunda 7
-adapter asks the same question for its call activities (`Camunda7CallActivities`). The extension
-builds no check of its own, and it does not use `BpmsInitiatedStartInvoker#startsAWorkflowOfItsOwn`.
-That answer is `true` for a process nobody declares and says nothing about the caller. A process the
-application does not claim is unknown to the core and shares nothing. So a call from such a process
-starts a case of its own. VanillaBP does not design for processes it did not deploy, so this is
-accepted.
-
-What changes:
-
-- The history handler reports the start and the end of a called instance which does not share its
-  caller's aggregate. A called instance is started without a business key, so its start is reported
-  once the adapter wrote the name, as decision 12 says.
-- A user task names the case as `workflowId`, and the instance it sits in as `subWorkflowId` only
-  where that is another one.
-- `workflowsOfAggregate` keeps a called instance which does not share its caller's aggregate.
-- `userTasksOfAggregate` and `userTaskOfAggregate` answer only tasks of a process which works on the
-  aggregate asked about. The business key alone does not say that. Two aggregate classes may count
-  their ids alike, and then a task of a case of its own carried the same key as the caller's case.
-
-**Two ways to walk.** A report at an event walks the executions the engine holds in its running
-command, because an instance started in the same command is not in the history yet. A read outside
-of such a command walks the history, which still knows an instance which ended. The class is
-`Camunda7BusinessCases`. Where the running command does not hold the caller of a history event,
-the instance is taken as a step, which is what every called process was before.
-
-`Camunda7BusinessCasesTest` shows both walks. `Camunda7CalledProcessCaseTest` shows it on an engine:
-one case calls a step on its own aggregate and a process with an aggregate of its own at the same
-time. It also checks the three calls of `BusinessCockpitService` which read VanillaBP's note of the
-start first (`aggregateChanged` twice and `getUserTask`), for both kinds of case.
+*Merged into decision 3 on 2026-10-12, before the 1.0 release.* Decision 3 now says which instances
+are a case of their own, and how the case of an instance is found.
 
 ## 16. The wiring names the user tasks of a model, so their providers are checked against its version
 

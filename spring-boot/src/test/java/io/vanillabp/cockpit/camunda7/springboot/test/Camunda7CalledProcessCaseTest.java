@@ -32,7 +32,7 @@ import io.vanillabp.integration.test.utils.SuppressOutputExtension;
  * <p>
  * One calling case starts two processes at once through call activities. The step works on the
  * caller's aggregate and belongs to the caller's case. The other process works on an aggregate of
- * its own, and the engine starts it as a case of its own. See decision 15 in the DECISIONS.md of
+ * its own, and the engine starts it as a case of its own. See decision 3 in the DECISIONS.md of
  * this repository.
  * <p>
  * Each case is also changed and read through the <code>BusinessCockpitService</code> of the

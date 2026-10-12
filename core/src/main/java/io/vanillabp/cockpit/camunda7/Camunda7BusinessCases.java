@@ -12,7 +12,7 @@ import org.camunda.bpm.engine.impl.persistence.entity.ExecutionEntity;
  * <p>
  * The cockpit shows business cases. A called process which shares the workflow aggregate of its
  * caller is a step of the caller's case. A called process with a workflow aggregate of its own is
- * a case of its own. See decision 15 in the repository's DECISIONS.md. So the case of an instance
+ * a case of its own. See decision 3 in the repository's DECISIONS.md. So the case of an instance
  * is the highest instance above it which can be reached by calls that share the aggregate. The
  * walk stops at the first caller which does not share it.
  * <p>

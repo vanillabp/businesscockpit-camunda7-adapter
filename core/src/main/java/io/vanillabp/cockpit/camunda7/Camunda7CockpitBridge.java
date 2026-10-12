@@ -184,7 +184,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
         .stream()
         // the cockpit shows business cases. A called process which shares its caller's
         // aggregate is a step of the caller's case, and one with an aggregate of its own is a
-        // case. See decisions 3 and 15 in the repository's DECISIONS.md
+        // case. See decision 3 in the repository's DECISIONS.md
         .filter(
             instance -> Camunda7BusinessCases
                 .isACase(
@@ -265,7 +265,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
    * Its process also has to work on the aggregate which was asked about. Two aggregate classes
    * may count their ids alike, so a business key does not say which aggregate it belongs to. A
    * task of a called process with an aggregate of its own belongs to that case and not to the
-   * caller's (decision 15 in the repository's DECISIONS.md).
+   * caller's (decision 3 in the repository's DECISIONS.md).
    *
    * @param task The task the engine answered with
    * @param workflowModuleId The workflow module which was asked about
@@ -516,7 +516,7 @@ public class Camunda7CockpitBridge implements BusinessCockpitBpmsBridge {
   }
 
   /**
-   * The business case of an instance, read from the history. See decision 15 in the
+   * The business case of an instance, read from the history. See decision 3 in the
    * repository's DECISIONS.md.
    */
   private String caseOf(
