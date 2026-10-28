@@ -91,7 +91,7 @@ cannot disagree with the engine it listens to.
 
 So the Spring Boot jar ships no configuration metadata, the file an IDE reads to offer the keys in
 `application.yaml`. The keys an application writes for the cockpit come from two other jars. The
-Camunda 7 adapter's Spring Boot jar describes `vanillabp.adapters.<id>.*`. The keys below
+Camunda 7 adapter's Spring Boot jar describes `vanillabp.adapters.<adapter-id>.*`. The keys below
 `vanillabp.cockpit` belong to the cockpit's `extensions-commons`, and its Spring Boot jar describes
 them. When this half reads a key of its own one day, it gets the configuration processor, a
 hand-written `additional-spring-configuration-metadata.json` and an `EveryKeyIsKnownToTheIdeTest`,
