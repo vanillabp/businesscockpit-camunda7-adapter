@@ -57,8 +57,8 @@ jobs:
           # the server of the profile 'central-portal' in io.vanillabp:release-parent. The
           # two names are environment variables, and only the step which publishes sets them
           server-id: vanillabp-central
-          server-username: MAVEN_USERNAME
-          server-password: MAVEN_PASSWORD
+          server-username-env-var: MAVEN_USERNAME
+          server-password-env-var: MAVEN_PASSWORD
       - name: Publish package
         run: mvn -s $GITHUB_WORKSPACE/.github/workflows/github-packages-settings.xml
           --batch-mode --no-transfer-progress --update-snapshots deploy -P central-portal
