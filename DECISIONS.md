@@ -121,7 +121,7 @@ An event of a process which is not among the deployed ones is not this applicati
 passed over. It comes from another application on the same database, or from a process definition
 of an earlier release.
 
-## 5. The outbox entry is written in the engine's transaction, unless the engine has its own
+## 5. The outbox entry is written in the engine's transaction, unless the engine has its own - the Quarkus paragraph superseded by decision 17
 
 The entry reporting what the engine did belongs in the transaction that work happens in. The
 cockpit then hears about a task if and only if the workflow which created it was committed, and a
@@ -450,3 +450,25 @@ A user task of a called process is reported with the called process and with the
 process definition, not with the caller's. The version of a task provider refers to the model the
 task belongs to. `Camunda7CockpitEventsTest` holds both: the user tasks a wiring names, and the
 version a task of a called process carries.
+
+## 17. On Quarkus, an engine on a data source of its own needs XA on one side
+
+Decision 5 said that XA is not asked for on Quarkus, and that a JTA transaction around two data
+sources which are not XA is still two commits. That is wrong. On Quarkus an engine on a data source
+of its own joins the same JTA transaction as the application's data source, and Narayana takes in
+only one data source without XA per transaction. The second one fails with "Exception in
+association of connection to existing transaction". Then the engine's job rolls back, and a start
+through the outbox fails with "Failed to enlist" and is repeated without end. So there are not two
+commits. There is no commit at all.
+
+The Camunda 7 adapter now checks this at boot and stops with a message which names both data
+sources and the key to set. One XA side is enough: either the engine's data source or the
+application's data source sets `jdbc.transactions: xa`. The extension does not check anything of
+its own, because the adapter's check runs first and covers the case.
+
+The rest of decision 5 stays. XA is what lets the engine's job and the application's work share one
+transaction at all. It does not change the adapter's answer: an engine on a data source of its own
+does not join the application's transaction, on Quarkus as on Spring Boot, so the cockpit's entry
+still gets a transaction of its own.
+
+`Camunda7OwnDataSourceTest` runs the engine on an XA data source.
